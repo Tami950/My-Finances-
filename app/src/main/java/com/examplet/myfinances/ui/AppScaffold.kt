@@ -24,9 +24,11 @@ fun AppScaffold() {
     val currentDest: NavDestination? = backStack?.destination
 
     Scaffold(
-        contentWindowInsets = WindowInsets.safeDrawing,
+        contentWindowInsets = WindowInsets(0),
         topBar = { AppTopBar() },
-        bottomBar = { AppBottomBar(currentDest) { route -> nav.navigate(route) } }
+        bottomBar = {
+            AppBottomBar(currentDestination = currentDest) { route -> nav.navigate(route) }
+        }
     ) { inner ->
         AppNavHost(navController = nav, modifier = Modifier.padding(inner))
     }
