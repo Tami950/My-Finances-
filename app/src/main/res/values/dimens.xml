@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!---BOTTOM BAR SIZES-->
+    <dimen name="bottom_nav_placeholder_round_size">2dp</dimen>
+
+    <dimen name="bottom_nav_placeholder_height_size">3dp</dimen>
+    <dimen name="bottom_nav_placeholder_width_size">20dp</dimen>
+
+    <dimen name="bottom_nav_icon_size">30dp</dimen>
+    <dimen name="bottom_nav_selected_icon_space_from_bottom_size">3dp</dimen>
+    <dimen name="bottom_nav_not_selected_icon_space_from_bottom_size">3dp</dimen>
+
+</resources>

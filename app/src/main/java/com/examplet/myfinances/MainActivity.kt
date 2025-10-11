@@ -2,46 +2,30 @@ package com.examplet.myfinances
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import dagger.hilt.android.AndroidEntryPoint
 import com.examplet.myfinances.ui.theme.MyFinancesTheme
+import com.examplet.myfinances.ui.AppScaffold
+import com.examplet.myfinances.ui.theme.darkBottomBar
+import com.examplet.myfinances.ui.theme.transparent
+import com.examplet.myfinances.ui.theme.white
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(
+                lightScrim = transparent,
+                darkScrim  = transparent
+            ),
+            navigationBarStyle = SystemBarStyle.auto(
+                lightScrim = white,
+                darkScrim  = darkBottomBar
+            )
+        )
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MyFinancesTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MyFinancesTheme {
-        Greeting("Android")
+        setContent { MyFinancesTheme { AppScaffold() } }
     }
 }
