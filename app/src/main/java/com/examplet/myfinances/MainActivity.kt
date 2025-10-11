@@ -6,12 +6,30 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -19,8 +37,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -29,24 +51,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.examplet.myfinances.ui.theme.MyFinancesTheme
-import dagger.hilt.android.AndroidEntryPoint
-import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.dimensionResource
 import com.examplet.myfinances.ui.theme.darkBottomBar
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
-import com.examplet.myfinances.ui.theme.white
 import com.examplet.myfinances.ui.theme.transparent
+import com.examplet.myfinances.ui.theme.white
+import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -62,7 +70,6 @@ class MainActivity : ComponentActivity() {
             )
         )
         super.onCreate(savedInstanceState)
-        window.decorView.setOnApplyWindowInsetsListener(null)
         setContent {
             MyFinancesTheme { AppScaffold() }
         }
@@ -74,7 +81,6 @@ private enum class Route(val route: String, @StringRes val labelRes: Int,) {
     Casa("casa", R.string.tab_casa),
     Personale("personale", R.string.tab_personale),
     Bollette("bollette", R.string.tab_bollette),
-    Settings("settings", R.string.tab_settings)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,13 +92,14 @@ private fun AppScaffold() {
 
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = { CenterAlignedTopAppBar(title = { Text(stringResource(R.string.title_app)) }) },
         bottomBar = {
             NavigationBar(
                 modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
             ) {
                 val items = listOf(
-                    Route.Dashboard, Route.Casa, Route.Personale, Route.Bollette, Route.Settings
+                    Route.Dashboard, Route.Casa, Route.Personale, Route.Bollette
                 )
                 items.forEach { item ->
                     val selected = currentDest?.hierarchy?.any { it.route == item.route } == true
@@ -113,8 +120,7 @@ private fun AppScaffold() {
                                     Route.Dashboard -> Icon(Icons.Outlined.Home, contentDescription = null, iconModifier)
                                     Route.Casa      -> Icon(Icons.Outlined.AccountBalance, contentDescription = null, iconModifier)
                                     Route.Personale -> Icon(Icons.Outlined.AccountCircle, contentDescription = null, iconModifier)
-                                    Route.Bollette  -> Icon(Icons.Outlined.ReceiptLong, contentDescription = null, iconModifier)
-                                    Route.Settings  -> Icon(Icons.Outlined.Settings, contentDescription = null, iconModifier)
+                                    Route.Bollette  -> Icon(Icons.AutoMirrored.Outlined.ReceiptLong, contentDescription = null, iconModifier)
                                 }
                                 // Testo in una sola riga con ellissi
                                 Text(
@@ -150,11 +156,10 @@ private fun AppScaffold() {
             modifier = Modifier
                 .padding(inner)
         ) {
-            composable(Route.Dashboard.route) { ScreenPlaceholder(stringResource(R.string.tab_dashboard), ) }
+            composable(Route.Dashboard.route) { ScreenPlaceholder(stringResource(R.string.tab_dashboard)) }
             composable(Route.Casa.route) { ScreenPlaceholder(stringResource(R.string.tab_casa)) }
             composable(Route.Personale.route) { ScreenPlaceholder(stringResource(R.string.tab_personale)) }
             composable(Route.Bollette.route) { ScreenPlaceholder(stringResource(R.string.tab_bollette)) }
-            composable(Route.Settings.route) { ScreenPlaceholder(stringResource(R.string.tab_settings)) }
         }
     }
 }

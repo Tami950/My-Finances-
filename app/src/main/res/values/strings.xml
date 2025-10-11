@@ -6,5 +6,5 @@
     <string name="tab_casa">Home</string>
     <string name="tab_personale">Mine</string>
     <string name="tab_bollette">Bills</string>
-    <string name="tab_settings">Sett</string>
+    <string name="tab_settings">Settings</string>
 </resources>
