@@ -3,8 +3,8 @@
     <string name="title_app">My Finances</string>
 
     <string name="tab_dashboard">Main</string>
-    <string name="tab_casa">Home</string>
-    <string name="tab_personale">Mine</string>
-    <string name="tab_bollette">Bills</string>
+    <string name="tab_home">Home</string>
+    <string name="tab_mine">Mine</string>
+    <string name="tab_bills">Bills</string>
     <string name="tab_settings">Settings</string>
 </resources>

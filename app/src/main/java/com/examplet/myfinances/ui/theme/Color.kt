@@ -12,6 +12,6 @@ val Pink40 = Color(0xFF7D5260)
 
 val white =0xFFFFFFFF.toInt()
 
-val transparent =0x00FFFFFF.toInt()
+val transparent = 0x00FFFFFF
 
 val darkBottomBar = 0xFF1C1C1C.toInt()
