@@ -7,7 +7,7 @@
     <dimen name="bottom_nav_placeholder_height_size">3dp</dimen>
     <dimen name="bottom_nav_placeholder_width_size">24dp</dimen>
 
-    <dimen name="bottom_nav_icon_size">30dp</dimen>
+    <dimen name="bottom_nav_icon_size">28dp</dimen>
     <dimen name="bottom_nav_selected_icon_space_from_bottom_size">3dp</dimen>
     <dimen name="bottom_nav_not_selected_icon_space_from_bottom_size">3dp</dimen>
 
