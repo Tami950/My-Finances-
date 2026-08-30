@@ -16,8 +16,26 @@
     <string name="house_setup_requirement">Per completare il setup servono almeno una categoria e un money account attivi.</string>
 
     <string name="house_planning_empty_title">Nessuna pianificazione per %1$s</string>
-    <string name="house_planning_empty_description">Il setup di Casa è completo. La creazione della pianificazione mensile sarà il prossimo passaggio.</string>
+    <string name="house_planning_empty_description">Puoi creare la pianificazione del mese usando le categorie e le posizioni configurate per Casa.</string>
     <string name="house_plan_month">Pianifica mese</string>
+    <string name="house_create_plan_title">Pianifica %1$s</string>
+    <string name="house_month_resources">Risorse Casa del mese</string>
+    <string name="house_month_note">Nota (opzionale)</string>
+    <string name="house_plan_categories_title">Categorie</string>
+    <string name="house_plan_accounts_title">Dove sono i soldi</string>
+    <string name="house_plan_summary">Riepilogo</string>
+    <string name="house_plan_category_breakdown">Già presente: %1$s € · Nuova allocazione: %2$s €</string>
+    <string name="house_opening_balance">Già presente nella categoria</string>
+    <string name="house_new_allocation">Nuova allocazione del mese</string>
+    <string name="house_category_total">Totale categoria</string>
+    <string name="house_account_month_amount">Soldi Casa presenti qui</string>
+    <string name="house_save_plan">Salva pianificazione</string>
+    <string name="house_summary_resources">Risorse</string>
+    <string name="house_summary_allocated">Allocato</string>
+    <string name="house_summary_unallocated">Da allocare</string>
+    <string name="house_summary_opening">Residui iniziali</string>
+    <string name="house_summary_positioned">Posizionato</string>
+    <string name="house_summary_unpositioned">Da posizionare</string>
 
     <string name="house_categories_title">Categorie Casa</string>
     <string name="house_categories_empty">Non hai ancora creato categorie.</string>
@@ -45,4 +63,7 @@
 
     <string name="action_save">Salva</string>
     <string name="action_cancel">Annulla</string>
+    <string name="action_back">Indietro</string>
+    <string name="action_done">Fatto</string>
+    <string name="action_saving">Salvataggio…</string>
 </resources>
