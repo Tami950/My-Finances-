@@ -19,7 +19,6 @@ import com.examplet.myfinances.domain.repository.HousePlanRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class HousePlanRepositoryImpl @Inject constructor(
@@ -139,8 +138,7 @@ class HousePlanRepositoryImpl @Inject constructor(
         database.withTransaction {
             val month = requireOpenMonth(houseMonthId)
             val currentPositioned = accountBalanceDao
-                .observeForMonth(houseMonthId)
-                .first()
+                .getForMonth(houseMonthId)
                 .sumOf { it.amountCents }
             require(currentPositioned <= draft.totalResourcesCents) {
                 "Le posizioni attuali superano le nuove risorse del mese"
@@ -222,8 +220,12 @@ class HousePlanRepositoryImpl @Inject constructor(
     }
 
     private suspend fun requireOpenMonth(houseMonthId: Long): HouseMonthEntity {
-        val month = requireNotNull(houseMonthDao.getById(houseMonthId)) { "Mese Casa non trovato" }
-        require(month.status == HouseMonthStatus.OPEN) { "Il mese è chiuso e non può essere modificato" }
+        val month = requireNotNull(houseMonthDao.getById(houseMonthId)) {
+            "Mese Casa non trovato"
+        }
+        require(month.status == HouseMonthStatus.OPEN) {
+            "Il mese è chiuso e non può essere modificato"
+        }
         return month
     }
 
@@ -236,10 +238,19 @@ class HousePlanRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun validateDraft(draft: HousePlanDraft, validatePositions: Boolean = true) {
+    private fun validateDraft(
+        draft: HousePlanDraft,
+        validatePositions: Boolean = true
+    ) {
         require(draft.month in 1..12) { "Mese non valido" }
-        require(draft.totalResourcesCents > 0) { "Le risorse del mese devono essere maggiori di zero" }
-        require(draft.allocations.all { it.openingBalanceCents >= 0 && it.allocatedCents >= 0 }) {
+        require(draft.totalResourcesCents > 0) {
+            "Le risorse del mese devono essere maggiori di zero"
+        }
+        require(
+            draft.allocations.all {
+                it.openingBalanceCents >= 0 && it.allocatedCents >= 0
+            }
+        ) {
             "Gli importi delle categorie non possono essere negativi"
         }
 
@@ -259,5 +270,6 @@ class HousePlanRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun normalizedNote(note: String?): String? = note?.trim()?.takeIf { it.isNotEmpty() }
+    private fun normalizedNote(note: String?): String? =
+        note?.trim()?.takeIf { it.isNotEmpty() }
 }
