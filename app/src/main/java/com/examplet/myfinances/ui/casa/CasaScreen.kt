@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -72,9 +73,11 @@ fun CasaScreen(viewModel: CasaViewModel = hiltViewModel()) {
                 onAddCategory = viewModel::openNewCategory,
                 onEditCategory = viewModel::openCategory,
                 onArchiveCategory = viewModel::archiveCategory,
+                onReactivateCategory = viewModel::reactivateCategory,
                 onAddAccount = viewModel::openNewMoneyAccount,
                 onEditAccount = viewModel::openMoneyAccount,
                 onArchiveAccount = viewModel::archiveMoneyAccount,
+                onReactivateAccount = viewModel::reactivateMoneyAccount,
                 onCompleteSetup = viewModel::completeHouseSetup
             )
         }
@@ -142,9 +145,11 @@ private fun CustomizationContent(
     onAddCategory: () -> Unit,
     onEditCategory: (HouseCategory) -> Unit,
     onArchiveCategory: (Long) -> Unit,
+    onReactivateCategory: (Long) -> Unit,
     onAddAccount: () -> Unit,
     onEditAccount: (MoneyAccount) -> Unit,
     onArchiveAccount: (Long) -> Unit,
+    onReactivateAccount: (Long) -> Unit,
     onCompleteSetup: () -> Unit
 ) {
     LazyColumn(
@@ -152,11 +157,13 @@ private fun CustomizationContent(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { Text(stringResource(R.string.house_categories_title), style = MaterialTheme.typography.titleLarge) }
-        if (state.categories.isEmpty()) {
-            item { Text(stringResource(R.string.house_categories_empty)) }
+        item(key = "categories-title") {
+            Text(stringResource(R.string.house_categories_title), style = MaterialTheme.typography.titleLarge)
         }
-        items(state.categories, key = { it.id }) { category ->
+        if (state.categories.isEmpty()) {
+            item(key = "categories-empty") { Text(stringResource(R.string.house_categories_empty)) }
+        }
+        items(state.categories, key = { "category-${it.id}" }) { category ->
             ManagerRow(
                 title = category.name,
                 subtitle = when (category.type) {
@@ -166,29 +173,39 @@ private fun CustomizationContent(
                         formatCents(category.targetCents ?: 0)
                     )
                 },
+                isArchived = category.isArchived,
                 onClick = { onEditCategory(category) },
-                onArchive = { onArchiveCategory(category.id) }
+                onArchive = { onArchiveCategory(category.id) },
+                onReactivate = { onReactivateCategory(category.id) }
             )
         }
-        item { OutlinedButton(onClick = onAddCategory) { Text(stringResource(R.string.house_add_category)) } }
-        item { HorizontalDivider(); Spacer(Modifier.height(4.dp)) }
-
-        item { Text(stringResource(R.string.house_accounts_title), style = MaterialTheme.typography.titleLarge) }
-        if (state.moneyAccounts.isEmpty()) {
-            item { Text(stringResource(R.string.house_accounts_empty)) }
+        item(key = "category-add") {
+            OutlinedButton(onClick = onAddCategory) { Text(stringResource(R.string.house_add_category)) }
         }
-        items(state.moneyAccounts, key = { it.id }) { account ->
+        item(key = "manager-divider") { HorizontalDivider(); Spacer(Modifier.height(4.dp)) }
+
+        item(key = "accounts-title") {
+            Text(stringResource(R.string.house_accounts_title), style = MaterialTheme.typography.titleLarge)
+        }
+        if (state.moneyAccounts.isEmpty()) {
+            item(key = "accounts-empty") { Text(stringResource(R.string.house_accounts_empty)) }
+        }
+        items(state.moneyAccounts, key = { "account-${it.id}" }) { account ->
             ManagerRow(
                 title = account.name,
                 subtitle = moneyAccountTypeLabel(account.type),
+                isArchived = account.isArchived,
                 onClick = { onEditAccount(account) },
-                onArchive = { onArchiveAccount(account.id) }
+                onArchive = { onArchiveAccount(account.id) },
+                onReactivate = { onReactivateAccount(account.id) }
             )
         }
-        item { OutlinedButton(onClick = onAddAccount) { Text(stringResource(R.string.house_add_account)) } }
+        item(key = "account-add") {
+            OutlinedButton(onClick = onAddAccount) { Text(stringResource(R.string.house_add_account)) }
+        }
 
         if (!state.isHouseSetupCompleted) {
-            item {
+            item(key = "setup-complete") {
                 Spacer(Modifier.height(12.dp))
                 if (!state.canCompleteSetup) {
                     Text(stringResource(R.string.house_setup_requirement), style = MaterialTheme.typography.bodySmall)
@@ -207,19 +224,32 @@ private fun CustomizationContent(
 }
 
 @Composable
-private fun ManagerRow(title: String, subtitle: String, onClick: () -> Unit, onArchive: () -> Unit) {
+private fun ManagerRow(
+    title: String,
+    subtitle: String,
+    isArchived: Boolean,
+    onClick: () -> Unit,
+    onArchive: () -> Unit,
+    onReactivate: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .alpha(if (isArchived) 0.5f else 1f)
+            .clickable(enabled = !isArchived, onClick = onClick)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            Text(
+                if (isArchived) "$subtitle · ${stringResource(R.string.house_archived)}" else subtitle,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
-        TextButton(onClick = onArchive) { Text(stringResource(R.string.house_archive)) }
+        TextButton(onClick = if (isArchived) onReactivate else onArchive) {
+            Text(stringResource(if (isArchived) R.string.house_reactivate else R.string.house_archive))
+        }
     }
 }
 
