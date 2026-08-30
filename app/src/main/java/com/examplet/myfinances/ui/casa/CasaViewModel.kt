@@ -48,6 +48,14 @@ data class CasaUiState(
         get() = categories.isNotEmpty() && moneyAccounts.isNotEmpty()
 }
 
+private data class CoreCasaState(
+    val isHouseSetupCompleted: Boolean,
+    val categories: List<HouseCategory>,
+    val moneyAccounts: List<MoneyAccount>,
+    val selectedTab: CasaTab,
+    val categoryDraft: CategoryDraft?
+)
+
 @HiltViewModel
 class CasaViewModel @Inject constructor(
     private val categoryRepository: HouseCategoryRepository,
@@ -60,24 +68,29 @@ class CasaViewModel @Inject constructor(
     private val moneyAccountDraft = MutableStateFlow<MoneyAccountDraft?>(null)
     private val errorMessage = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<CasaUiState> = combine(
+    private val coreState = combine(
         appPreferencesRepository.isHouseSetupCompleted,
         categoryRepository.observeCategories(),
         moneyAccountRepository.observeAccounts(),
         selectedTab,
-        categoryDraft,
+        categoryDraft
+    ) { setupCompleted, categories, accounts, tab, category ->
+        CoreCasaState(setupCompleted, categories, accounts, tab, category)
+    }
+
+    val uiState: StateFlow<CasaUiState> = combine(
+        coreState,
         moneyAccountDraft,
         errorMessage
-    ) { values ->
-        @Suppress("UNCHECKED_CAST")
+    ) { core, accountDraft, error ->
         CasaUiState(
-            isHouseSetupCompleted = values[0] as Boolean,
-            categories = values[1] as List<HouseCategory>,
-            moneyAccounts = values[2] as List<MoneyAccount>,
-            selectedTab = values[3] as CasaTab,
-            categoryDraft = values[4] as CategoryDraft?,
-            moneyAccountDraft = values[5] as MoneyAccountDraft?,
-            errorMessage = values[6] as String?
+            isHouseSetupCompleted = core.isHouseSetupCompleted,
+            categories = core.categories,
+            moneyAccounts = core.moneyAccounts,
+            selectedTab = core.selectedTab,
+            categoryDraft = core.categoryDraft,
+            moneyAccountDraft = accountDraft,
+            errorMessage = error
         )
     }.stateIn(
         scope = viewModelScope,
@@ -85,27 +98,18 @@ class CasaViewModel @Inject constructor(
         initialValue = CasaUiState()
     )
 
-    fun selectTab(tab: CasaTab) {
-        selectedTab.value = tab
-    }
-
-    fun startHouseSetup() {
-        selectedTab.value = CasaTab.CUSTOMIZATION
-    }
+    fun selectTab(tab: CasaTab) { selectedTab.value = tab }
+    fun startHouseSetup() { selectedTab.value = CasaTab.CUSTOMIZATION }
 
     fun completeHouseSetup() {
-        val state = uiState.value
-        if (!state.canCompleteSetup) return
+        if (!uiState.value.canCompleteSetup) return
         viewModelScope.launch {
             appPreferencesRepository.setHouseSetupCompleted(true)
             selectedTab.value = CasaTab.PLANNING
         }
     }
 
-    fun openNewCategory() {
-        categoryDraft.value = CategoryDraft()
-    }
-
+    fun openNewCategory() { categoryDraft.value = CategoryDraft() }
     fun openCategory(category: HouseCategory) {
         categoryDraft.value = CategoryDraft(
             id = category.id,
@@ -114,43 +118,22 @@ class CasaViewModel @Inject constructor(
             targetText = category.targetCents?.let(::formatCentsForInput).orEmpty()
         )
     }
-
-    fun updateCategoryDraftName(name: String) {
-        categoryDraft.value = categoryDraft.value?.copy(name = name)
-    }
-
-    fun updateCategoryDraftType(type: HouseCategoryType) {
-        categoryDraft.value = categoryDraft.value?.copy(type = type)
-    }
-
-    fun updateCategoryDraftTarget(target: String) {
-        categoryDraft.value = categoryDraft.value?.copy(targetText = target)
-    }
-
-    fun dismissCategoryDialog() {
-        categoryDraft.value = null
-        errorMessage.value = null
-    }
+    fun updateCategoryDraftName(name: String) { categoryDraft.value = categoryDraft.value?.copy(name = name) }
+    fun updateCategoryDraftType(type: HouseCategoryType) { categoryDraft.value = categoryDraft.value?.copy(type = type) }
+    fun updateCategoryDraftTarget(target: String) { categoryDraft.value = categoryDraft.value?.copy(targetText = target) }
+    fun dismissCategoryDialog() { categoryDraft.value = null; errorMessage.value = null }
 
     fun saveCategory() {
         val draft = categoryDraft.value ?: return
         viewModelScope.launch {
             runCatching {
-                val targetCents = if (draft.type == HouseCategoryType.TARGET) {
-                    parseEuroToCents(draft.targetText)
-                } else null
-
-                if (draft.id == null) {
-                    categoryRepository.createCategory(draft.name, draft.type, targetCents)
-                } else {
-                    categoryRepository.updateCategory(draft.id, draft.name, draft.type, targetCents)
-                }
+                val targetCents = if (draft.type == HouseCategoryType.TARGET) parseEuroToCents(draft.targetText) else null
+                if (draft.id == null) categoryRepository.createCategory(draft.name, draft.type, targetCents)
+                else categoryRepository.updateCategory(draft.id, draft.name, draft.type, targetCents)
             }.onSuccess {
                 categoryDraft.value = null
                 errorMessage.value = null
-            }.onFailure {
-                errorMessage.value = it.message ?: "Errore durante il salvataggio"
-            }
+            }.onFailure { errorMessage.value = it.message ?: "Errore durante il salvataggio" }
         }
     }
 
@@ -158,42 +141,24 @@ class CasaViewModel @Inject constructor(
         viewModelScope.launch { categoryRepository.setCategoryArchived(id, true) }
     }
 
-    fun openNewMoneyAccount() {
-        moneyAccountDraft.value = MoneyAccountDraft()
-    }
-
+    fun openNewMoneyAccount() { moneyAccountDraft.value = MoneyAccountDraft() }
     fun openMoneyAccount(account: MoneyAccount) {
         moneyAccountDraft.value = MoneyAccountDraft(account.id, account.name, account.type)
     }
-
-    fun updateMoneyAccountDraftName(name: String) {
-        moneyAccountDraft.value = moneyAccountDraft.value?.copy(name = name)
-    }
-
-    fun updateMoneyAccountDraftType(type: MoneyAccountType) {
-        moneyAccountDraft.value = moneyAccountDraft.value?.copy(type = type)
-    }
-
-    fun dismissMoneyAccountDialog() {
-        moneyAccountDraft.value = null
-        errorMessage.value = null
-    }
+    fun updateMoneyAccountDraftName(name: String) { moneyAccountDraft.value = moneyAccountDraft.value?.copy(name = name) }
+    fun updateMoneyAccountDraftType(type: MoneyAccountType) { moneyAccountDraft.value = moneyAccountDraft.value?.copy(type = type) }
+    fun dismissMoneyAccountDialog() { moneyAccountDraft.value = null; errorMessage.value = null }
 
     fun saveMoneyAccount() {
         val draft = moneyAccountDraft.value ?: return
         viewModelScope.launch {
             runCatching {
-                if (draft.id == null) {
-                    moneyAccountRepository.createAccount(draft.name, draft.type)
-                } else {
-                    moneyAccountRepository.updateAccount(draft.id, draft.name, draft.type)
-                }
+                if (draft.id == null) moneyAccountRepository.createAccount(draft.name, draft.type)
+                else moneyAccountRepository.updateAccount(draft.id, draft.name, draft.type)
             }.onSuccess {
                 moneyAccountDraft.value = null
                 errorMessage.value = null
-            }.onFailure {
-                errorMessage.value = it.message ?: "Errore durante il salvataggio"
-            }
+            }.onFailure { errorMessage.value = it.message ?: "Errore durante il salvataggio" }
         }
     }
 
