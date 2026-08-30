@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.examplet.myfinances.data.repository.AppPreferencesRepository
 import com.examplet.myfinances.domain.model.HouseCategory
 import com.examplet.myfinances.domain.model.HouseCategoryType
+import com.examplet.myfinances.domain.model.HousePlanDetails
 import com.examplet.myfinances.domain.model.HousePlanSummary
 import com.examplet.myfinances.domain.model.MoneyAccount
 import com.examplet.myfinances.domain.model.MoneyAccountType
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -43,6 +46,7 @@ data class CasaUiState(
     val categories: List<HouseCategory> = emptyList(),
     val moneyAccounts: List<MoneyAccount> = emptyList(),
     val currentPlan: HousePlanSummary? = null,
+    val currentPlanDetails: HousePlanDetails? = null,
     val selectedTab: CasaTab = CasaTab.PLANNING,
     val categoryDraft: CategoryDraft? = null,
     val moneyAccountDraft: MoneyAccountDraft? = null,
@@ -89,17 +93,24 @@ class CasaViewModel @Inject constructor(
         month = currentDate.monthValue
     )
 
+    private val currentPlanDetails = currentPlan.flatMapLatest { summary ->
+        if (summary == null) flowOf(null)
+        else housePlanRepository.observeDetails(summary.id)
+    }
+
     val uiState: StateFlow<CasaUiState> = combine(
         coreState,
         moneyAccountDraft,
         errorMessage,
-        currentPlan
-    ) { core, accountDraft, error, plan ->
+        currentPlan,
+        currentPlanDetails
+    ) { core, accountDraft, error, plan, details ->
         CasaUiState(
             isHouseSetupCompleted = core.isHouseSetupCompleted,
             categories = core.categories,
             moneyAccounts = core.moneyAccounts,
             currentPlan = plan,
+            currentPlanDetails = details,
             selectedTab = core.selectedTab,
             categoryDraft = core.categoryDraft,
             moneyAccountDraft = accountDraft,
@@ -112,6 +123,7 @@ class CasaViewModel @Inject constructor(
     )
 
     fun selectTab(tab: CasaTab) { selectedTab.value = tab }
+    fun resetToPlanning() { selectedTab.value = CasaTab.PLANNING }
     fun startHouseSetup() { selectedTab.value = CasaTab.CUSTOMIZATION }
 
     fun completeHouseSetup() {
