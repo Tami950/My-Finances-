@@ -30,6 +30,9 @@ interface HouseMonthDao {
     @Query("SELECT * FROM house_months WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): HouseMonthEntity?
 
+    @Query("SELECT * FROM house_months WHERE year = :year AND month = :month LIMIT 1")
+    suspend fun getByYearMonth(year: Int, month: Int): HouseMonthEntity?
+
     @Query(
         """
         SELECT
