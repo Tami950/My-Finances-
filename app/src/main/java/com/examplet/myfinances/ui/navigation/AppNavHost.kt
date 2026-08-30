@@ -12,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.examplet.myfinances.R
+import com.examplet.myfinances.ui.casa.CasaScreen
 
 @Composable
 fun AppNavHost(
@@ -24,7 +25,7 @@ fun AppNavHost(
         modifier = modifier
     ) {
         composable(Route.Dashboard.route) { ScreenPlaceholder(stringResource(R.string.tab_dashboard)) }
-        composable(Route.Casa.route) { ScreenPlaceholder(stringResource(R.string.tab_home)) }
+        composable(Route.Casa.route) { CasaScreen() }
         composable(Route.Personale.route) { ScreenPlaceholder(stringResource(R.string.tab_mine)) }
         composable(Route.Bollette.route) { ScreenPlaceholder(stringResource(R.string.tab_bills)) }
     }
