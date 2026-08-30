@@ -22,6 +22,9 @@ interface HouseMonthAccountBalanceDao {
     @Query("SELECT * FROM house_month_account_balances WHERE houseMonthId = :houseMonthId ORDER BY id ASC")
     fun observeForMonth(houseMonthId: Long): Flow<List<HouseMonthAccountBalanceEntity>>
 
+    @Query("SELECT * FROM house_month_account_balances WHERE houseMonthId = :houseMonthId ORDER BY id ASC")
+    suspend fun getForMonth(houseMonthId: Long): List<HouseMonthAccountBalanceEntity>
+
     @Query(
         """
         SELECT
