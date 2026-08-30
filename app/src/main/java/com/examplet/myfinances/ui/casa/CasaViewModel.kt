@@ -77,6 +77,7 @@ class CasaViewModel @Inject constructor(
     private val moneyAccountDraft = MutableStateFlow<MoneyAccountDraft?>(null)
     private val errorMessage = MutableStateFlow<String?>(null)
     private val currentDate = LocalDate.now()
+    private var entryDefaultApplied = false
 
     private val coreState = combine(
         appPreferencesRepository.isHouseSetupCompleted,
@@ -123,7 +124,13 @@ class CasaViewModel @Inject constructor(
     )
 
     fun selectTab(tab: CasaTab) { selectedTab.value = tab }
-    fun resetToPlanning() { selectedTab.value = CasaTab.PLANNING }
+
+    fun resetToPlanning() {
+        if (entryDefaultApplied) return
+        selectedTab.value = CasaTab.PLANNING
+        entryDefaultApplied = true
+    }
+
     fun startHouseSetup() { selectedTab.value = CasaTab.CUSTOMIZATION }
 
     fun completeHouseSetup() {
