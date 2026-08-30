@@ -45,7 +45,7 @@ data class CasaUiState(
     val errorMessage: String? = null
 ) {
     val canCompleteSetup: Boolean
-        get() = categories.isNotEmpty() && moneyAccounts.isNotEmpty()
+        get() = categories.any { !it.isArchived } && moneyAccounts.any { !it.isArchived }
 }
 
 private data class CoreCasaState(
@@ -70,8 +70,8 @@ class CasaViewModel @Inject constructor(
 
     private val coreState = combine(
         appPreferencesRepository.isHouseSetupCompleted,
-        categoryRepository.observeCategories(),
-        moneyAccountRepository.observeAccounts(),
+        categoryRepository.observeCategories(includeArchived = true),
+        moneyAccountRepository.observeAccounts(includeArchived = true),
         selectedTab,
         categoryDraft
     ) { setupCompleted, categories, accounts, tab, category ->
@@ -110,7 +110,9 @@ class CasaViewModel @Inject constructor(
     }
 
     fun openNewCategory() { categoryDraft.value = CategoryDraft() }
+
     fun openCategory(category: HouseCategory) {
+        if (category.isArchived) return
         categoryDraft.value = CategoryDraft(
             id = category.id,
             name = category.name,
@@ -118,6 +120,7 @@ class CasaViewModel @Inject constructor(
             targetText = category.targetCents?.let(::formatCentsForInput).orEmpty()
         )
     }
+
     fun updateCategoryDraftName(name: String) { categoryDraft.value = categoryDraft.value?.copy(name = name) }
     fun updateCategoryDraftType(type: HouseCategoryType) { categoryDraft.value = categoryDraft.value?.copy(type = type) }
     fun updateCategoryDraftTarget(target: String) { categoryDraft.value = categoryDraft.value?.copy(targetText = target) }
@@ -141,10 +144,17 @@ class CasaViewModel @Inject constructor(
         viewModelScope.launch { categoryRepository.setCategoryArchived(id, true) }
     }
 
+    fun reactivateCategory(id: Long) {
+        viewModelScope.launch { categoryRepository.setCategoryArchived(id, false) }
+    }
+
     fun openNewMoneyAccount() { moneyAccountDraft.value = MoneyAccountDraft() }
+
     fun openMoneyAccount(account: MoneyAccount) {
+        if (account.isArchived) return
         moneyAccountDraft.value = MoneyAccountDraft(account.id, account.name, account.type)
     }
+
     fun updateMoneyAccountDraftName(name: String) { moneyAccountDraft.value = moneyAccountDraft.value?.copy(name = name) }
     fun updateMoneyAccountDraftType(type: MoneyAccountType) { moneyAccountDraft.value = moneyAccountDraft.value?.copy(type = type) }
     fun dismissMoneyAccountDialog() { moneyAccountDraft.value = null; errorMessage.value = null }
@@ -164,6 +174,10 @@ class CasaViewModel @Inject constructor(
 
     fun archiveMoneyAccount(id: Long) {
         viewModelScope.launch { moneyAccountRepository.setAccountArchived(id, true) }
+    }
+
+    fun reactivateMoneyAccount(id: Long) {
+        viewModelScope.launch { moneyAccountRepository.setAccountArchived(id, false) }
     }
 
     private fun parseEuroToCents(value: String): Long {
