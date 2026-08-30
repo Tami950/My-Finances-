@@ -106,8 +106,14 @@ class CasaViewModel @Inject constructor(
         currentPlan,
         currentPlanDetails
     ) { core, accountDraft, error, plan, details ->
+        val hasPlanningPrerequisites =
+            core.categories.any { !it.isArchived } && core.moneyAccounts.any { !it.isArchived }
+
         CasaUiState(
-            isHouseSetupCompleted = core.isHouseSetupCompleted,
+            // The persisted flag still means "initial setup was completed".
+            // Planning readiness is stricter: if all categories/accounts are later archived,
+            // the UI must return to configuration instead of allowing an empty month plan.
+            isHouseSetupCompleted = core.isHouseSetupCompleted && hasPlanningPrerequisites,
             categories = core.categories,
             moneyAccounts = core.moneyAccounts,
             currentPlan = plan,
