@@ -124,8 +124,8 @@ fun CreateHousePlanScreen(
                         Text(
                             stringResource(
                                 R.string.house_plan_category_breakdown,
-                                formatCents(parseCentsOrZero(row.openingBalanceText)),
-                                formatCents(parseCentsOrZero(row.allocatedText))
+                                formatCents(parseCentsOrZeroLocal(row.openingBalanceText)),
+                                formatCents(parseCentsOrZeroLocal(row.allocatedText))
                             ),
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -143,6 +143,16 @@ fun CreateHousePlanScreen(
                     if (state.openingBalanceCents > 0) {
                         SummaryRow(stringResource(R.string.house_summary_opening), state.openingBalanceCents)
                     }
+                    if (state.hasAllocationOverflow) {
+                        Text(
+                            stringResource(
+                                R.string.house_allocation_overflow_error,
+                                formatCents(state.allocationOverflowCents)
+                            ),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
 
@@ -151,6 +161,10 @@ fun CreateHousePlanScreen(
                 Text(
                     stringResource(R.string.house_plan_accounts_title),
                     style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    stringResource(R.string.house_positions_current_help),
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
 
@@ -163,7 +177,7 @@ fun CreateHousePlanScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(row.account.name, modifier = Modifier.weight(1f))
-                    Text(formatCents(parseCentsOrZero(row.amountText)))
+                    Text(formatCents(parseCentsOrZeroLocal(row.amountText)))
                 }
             }
 
@@ -171,6 +185,16 @@ fun CreateHousePlanScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     SummaryRow(stringResource(R.string.house_summary_positioned), state.positionedCents)
                     SummaryRow(stringResource(R.string.house_summary_unpositioned), state.unpositionedCents)
+                    if (state.hasPositionOverflow) {
+                        Text(
+                            stringResource(
+                                R.string.house_position_overflow_error,
+                                formatCents(state.positionOverflowCents)
+                            ),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
 
@@ -183,7 +207,7 @@ fun CreateHousePlanScreen(
             item(key = "save") {
                 Button(
                     onClick = viewModel::savePlan,
-                    enabled = !state.isSaving && state.totalResourcesText.isNotBlank(),
+                    enabled = state.canSave,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -231,6 +255,15 @@ fun CreateHousePlanScreen(
                 stringResource(R.string.house_category_total),
                 rowTotalCents(row)
             )
+            if (state.hasAllocationOverflow) {
+                Text(
+                    stringResource(
+                        R.string.house_allocation_overflow_error,
+                        formatCents(state.allocationOverflowCents)
+                    ),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 
@@ -257,27 +290,36 @@ fun CreateHousePlanScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            if (state.hasPositionOverflow) {
+                Text(
+                    stringResource(
+                        R.string.house_position_overflow_error,
+                        formatCents(state.positionOverflowCents)
+                    ),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun SummaryRow(label: String, cents: Long) {
+internal fun SummaryRow(label: String, cents: Long) {
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(label, modifier = Modifier.weight(1f))
-        Text(formatCents(cents))
+        Text(formatHouseCents(cents))
     }
 }
 
-private fun monthLabel(month: Int, year: Int): String {
+internal fun monthLabel(month: Int, year: Int): String {
     val monthName = Month.of(month).getDisplayName(TextStyle.FULL, Locale.ITALIAN)
     return "${monthName.replaceFirstChar { it.uppercase() }} $year"
 }
 
 private fun rowTotalCents(row: HousePlanCategoryDraftUi): Long =
-    parseCentsOrZero(row.openingBalanceText) + parseCentsOrZero(row.allocatedText)
+    parseCentsOrZeroLocal(row.openingBalanceText) + parseCentsOrZeroLocal(row.allocatedText)
 
-private fun parseCentsOrZero(value: String): Long = runCatching {
+private fun parseCentsOrZeroLocal(value: String): Long = runCatching {
     val normalized = value.trim().replace(',', '.')
     if (normalized.isEmpty()) return@runCatching 0L
     normalized.toBigDecimal()
@@ -286,7 +328,9 @@ private fun parseCentsOrZero(value: String): Long = runCatching {
         .longValueExact()
 }.getOrDefault(0L)
 
-private fun formatCents(cents: Long): String {
+internal fun formatHouseCents(cents: Long): String {
     val formatter = NumberFormat.getCurrencyInstance(Locale.ITALY)
     return formatter.format(BigDecimal(cents).movePointLeft(2))
 }
+
+private fun formatCents(cents: Long): String = formatHouseCents(cents)
