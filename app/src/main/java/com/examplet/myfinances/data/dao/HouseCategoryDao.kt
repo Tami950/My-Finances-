@@ -14,13 +14,22 @@ interface HouseCategoryDao {
         """
         SELECT * FROM house_categories
         WHERE (:includeArchived = 1 OR isArchived = 0)
-        ORDER BY sortOrder ASC, name COLLATE NOCASE ASC
+        ORDER BY isArchived ASC, sortOrder ASC, name COLLATE NOCASE ASC
         """
     )
     fun observeCategories(includeArchived: Boolean = false): Flow<List<HouseCategoryEntity>>
 
     @Query("SELECT * FROM house_categories WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): HouseCategoryEntity?
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM house_categories
+        WHERE name = :name COLLATE NOCASE
+        AND (:excludeId IS NULL OR id != :excludeId)
+        """
+    )
+    suspend fun countByName(name: String, excludeId: Long? = null): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(category: HouseCategoryEntity): Long
