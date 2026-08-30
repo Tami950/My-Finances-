@@ -172,6 +172,9 @@ class HousePlanRepositoryImpl @Inject constructor(
         houseMonthId: Long,
         accountBalances: List<HousePlanAccountBalanceDraft>
     ) {
+        require(accountBalances.isNotEmpty()) {
+            "Serve almeno una posizione del denaro disponibile"
+        }
         require(accountBalances.all { it.amountCents >= 0 }) {
             "Le posizioni del denaro non possono essere negative"
         }
@@ -246,6 +249,9 @@ class HousePlanRepositoryImpl @Inject constructor(
         require(draft.totalResourcesCents > 0) {
             "Le risorse del mese devono essere maggiori di zero"
         }
+        require(draft.allocations.isNotEmpty()) {
+            "Serve almeno una categoria Casa disponibile"
+        }
         require(
             draft.allocations.all {
                 it.openingBalanceCents >= 0 && it.allocatedCents >= 0
@@ -260,6 +266,9 @@ class HousePlanRepositoryImpl @Inject constructor(
         }
 
         if (validatePositions) {
+            require(draft.accountBalances.isNotEmpty()) {
+                "Serve almeno una posizione del denaro disponibile"
+            }
             require(draft.accountBalances.all { it.amountCents >= 0 }) {
                 "Le posizioni del denaro non possono essere negative"
             }
