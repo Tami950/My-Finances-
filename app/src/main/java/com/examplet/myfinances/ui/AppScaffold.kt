@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.examplet.myfinances.ui.components.AppBottomBar
 import com.examplet.myfinances.ui.components.AppTopBar
 import com.examplet.myfinances.ui.navigation.AppNavHost
+import com.examplet.myfinances.ui.navigation.Route
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +32,9 @@ fun AppScaffold() {
                 onNavigate = { route ->
                     nav.navigate(route) {
                         launchSingleTop = true
-                        restoreState = true
+                        // Casa deve sempre ripartire dalla sua destinazione di default
+                        // quando viene riaperta dalla bottom navigation.
+                        restoreState = route != Route.Casa.route
                         popUpTo(nav.graph.findStartDestination().id) {
                             saveState = true
                         }
