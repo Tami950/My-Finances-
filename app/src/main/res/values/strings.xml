@@ -22,9 +22,12 @@
     <string name="house_month_resources">Risorse Casa del mese</string>
     <string name="house_month_note">Nota (opzionale)</string>
     <string name="house_plan_categories_title">Categorie</string>
-    <string name="house_plan_accounts_title">Dove sono i soldi</string>
+    <string name="house_plan_accounts_title">Posizione attuale dei soldi</string>
+    <string name="house_current_positions_title">Posizione attuale dei soldi</string>
+    <string name="house_positions_current_help">Indica dove si trovano adesso le risorse di Casa. Lo stesso denaro non può essere conteggiato in più posizioni.</string>
+    <string name="house_positions_empty_current">Nessuna risorsa è ancora stata assegnata a una posizione.</string>
     <string name="house_plan_summary">Riepilogo</string>
-    <string name="house_plan_category_breakdown">Già presente: %1$s € · Nuova allocazione: %2$s €</string>
+    <string name="house_plan_category_breakdown">Già presente: %1$s · Nuova allocazione: %2$s</string>
     <string name="house_opening_balance">Già presente nella categoria</string>
     <string name="house_new_allocation">Nuova allocazione del mese</string>
     <string name="house_category_total">Totale categoria</string>
@@ -36,6 +39,17 @@
     <string name="house_summary_opening">Residui iniziali</string>
     <string name="house_summary_positioned">Posizionato</string>
     <string name="house_summary_unpositioned">Da posizionare</string>
+    <string name="house_allocation_overflow_error">Hai allocato %1$s più delle risorse disponibili.</string>
+    <string name="house_position_overflow_error">Hai posizionato %1$s più delle risorse disponibili.</string>
+    <string name="house_resources_below_positions_error">Le risorse del mese non possono essere ridotte sotto il totale già presente nelle posizioni.</string>
+    <string name="house_month_status_open">Aperto</string>
+    <string name="house_month_status_closed">Chiuso</string>
+    <string name="house_loading_plan">Caricamento pianificazione…</string>
+    <string name="house_edit_plan_action">Modifica pianificazione</string>
+    <string name="house_edit_positions_action">Modifica posizioni</string>
+    <string name="house_edit_plan_title">Modifica pianificazione</string>
+    <string name="house_edit_positions_title">Modifica posizioni</string>
+    <string name="house_month_closed_edit_blocked">Questo mese è chiuso e non può essere modificato.</string>
 
     <string name="house_categories_title">Categorie Casa</string>
     <string name="house_categories_empty">Non hai ancora creato categorie.</string>
