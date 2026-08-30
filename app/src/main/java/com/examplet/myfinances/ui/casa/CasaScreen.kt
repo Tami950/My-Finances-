@@ -5,18 +5,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -24,6 +32,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,7 +58,11 @@ import java.util.Locale
 fun CasaScreen(viewModel: CasaViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+    ) {
         TabRow(selectedTabIndex = state.selectedTab.ordinal) {
             Tab(
                 selected = state.selectedTab == CasaTab.PLANNING,
@@ -84,7 +97,7 @@ fun CasaScreen(viewModel: CasaViewModel = hiltViewModel()) {
     }
 
     state.categoryDraft?.let { draft ->
-        CategoryDialog(
+        CategorySheet(
             draft = draft,
             errorMessage = state.errorMessage,
             onNameChange = viewModel::updateCategoryDraftName,
@@ -96,7 +109,7 @@ fun CasaScreen(viewModel: CasaViewModel = hiltViewModel()) {
     }
 
     state.moneyAccountDraft?.let { draft ->
-        MoneyAccountDialog(
+        MoneyAccountSheet(
             draft = draft,
             errorMessage = state.errorMessage,
             onNameChange = viewModel::updateMoneyAccountDraftName,
@@ -254,7 +267,7 @@ private fun ManagerRow(
 }
 
 @Composable
-private fun CategoryDialog(
+private fun CategorySheet(
     draft: CategoryDraft,
     errorMessage: String?,
     onNameChange: (String) -> Unit,
@@ -263,42 +276,62 @@ private fun CategoryDialog(
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (draft.id == null) R.string.house_add_category else R.string.house_edit_category)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = draft.name,
-                    onValueChange = onNameChange,
-                    label = { Text(stringResource(R.string.house_category_name)) },
-                    singleLine = true
-                )
-                ChoiceRow(stringResource(R.string.house_category_flexible), draft.type == HouseCategoryType.FLEXIBLE) {
-                    onTypeChange(HouseCategoryType.FLEXIBLE)
-                }
-                ChoiceRow(stringResource(R.string.house_category_target), draft.type == HouseCategoryType.TARGET) {
-                    onTypeChange(HouseCategoryType.TARGET)
-                }
-                if (draft.type == HouseCategoryType.TARGET) {
-                    OutlinedTextField(
-                        value = draft.targetText,
-                        onValueChange = onTargetChange,
-                        label = { Text(stringResource(R.string.house_category_target_amount)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true
-                    )
-                }
-                errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                stringResource(if (draft.id == null) R.string.house_add_category else R.string.house_edit_category),
+                style = MaterialTheme.typography.titleLarge
+            )
+            OutlinedTextField(
+                value = draft.name,
+                onValueChange = onNameChange,
+                label = { Text(stringResource(R.string.house_category_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            ChoiceRow(stringResource(R.string.house_category_flexible), draft.type == HouseCategoryType.FLEXIBLE) {
+                onTypeChange(HouseCategoryType.FLEXIBLE)
             }
-        },
-        confirmButton = { TextButton(onClick = onSave) { Text(stringResource(R.string.action_save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
-    )
+            ChoiceRow(stringResource(R.string.house_category_target), draft.type == HouseCategoryType.TARGET) {
+                onTypeChange(HouseCategoryType.TARGET)
+            }
+            if (draft.type == HouseCategoryType.TARGET) {
+                OutlinedTextField(
+                    value = draft.targetText,
+                    onValueChange = onTargetChange,
+                    label = { Text(stringResource(R.string.house_category_target_amount)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                Button(onClick = onSave) { Text(stringResource(R.string.action_save)) }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
 }
 
 @Composable
-private fun MoneyAccountDialog(
+private fun MoneyAccountSheet(
     draft: MoneyAccountDraft,
     errorMessage: String?,
     onNameChange: (String) -> Unit,
@@ -306,32 +339,53 @@ private fun MoneyAccountDialog(
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (draft.id == null) R.string.house_add_account else R.string.house_edit_account)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = draft.name,
-                    onValueChange = onNameChange,
-                    label = { Text(stringResource(R.string.house_account_name)) },
-                    singleLine = true
-                )
-                MoneyAccountType.entries.forEach { type ->
-                    ChoiceRow(moneyAccountTypeLabel(type), draft.type == type) { onTypeChange(type) }
-                }
-                errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                stringResource(if (draft.id == null) R.string.house_add_account else R.string.house_edit_account),
+                style = MaterialTheme.typography.titleLarge
+            )
+            OutlinedTextField(
+                value = draft.name,
+                onValueChange = onNameChange,
+                label = { Text(stringResource(R.string.house_account_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            MoneyAccountType.entries.forEach { type ->
+                ChoiceRow(moneyAccountTypeLabel(type), draft.type == type) { onTypeChange(type) }
             }
-        },
-        confirmButton = { TextButton(onClick = onSave) { Text(stringResource(R.string.action_save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
-    )
+            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                Button(onClick = onSave) { Text(stringResource(R.string.action_save)) }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
 }
 
 @Composable
 private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(selected = selected, onClick = onClick)
