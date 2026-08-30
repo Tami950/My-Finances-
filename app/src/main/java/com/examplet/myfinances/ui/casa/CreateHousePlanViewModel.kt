@@ -61,6 +61,24 @@ data class CreateHousePlanUiState(
 
     val unpositionedCents: Long
         get() = totalResourcesCents - positionedCents
+
+    val allocationOverflowCents: Long
+        get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
+
+    val positionOverflowCents: Long
+        get() = (positionedCents - totalResourcesCents).coerceAtLeast(0)
+
+    val hasAllocationOverflow: Boolean
+        get() = allocationOverflowCents > 0
+
+    val hasPositionOverflow: Boolean
+        get() = positionOverflowCents > 0
+
+    val canSave: Boolean
+        get() = !isSaving &&
+            totalResourcesCents > 0 &&
+            !hasAllocationOverflow &&
+            !hasPositionOverflow
 }
 
 @HiltViewModel
@@ -150,7 +168,9 @@ class CreateHousePlanViewModel @Inject constructor(
     }
 
     fun savePlan() {
-        if (_uiState.value.isSaving) return
+        val currentState = _uiState.value
+        if (!currentState.canSave) return
+
         viewModelScope.launch {
             runCatching {
                 val state = _uiState.value
@@ -194,7 +214,7 @@ class CreateHousePlanViewModel @Inject constructor(
     }
 }
 
-private fun parseEuroToCents(value: String, allowBlank: Boolean): Long {
+internal fun parseEuroToCents(value: String, allowBlank: Boolean): Long {
     val normalized = value.trim().replace(',', '.')
     if (normalized.isEmpty() && allowBlank) return 0
     require(normalized.isNotEmpty()) { "Inserisci un importo valido" }
@@ -203,6 +223,9 @@ private fun parseEuroToCents(value: String, allowBlank: Boolean): Long {
     return amount.movePointRight(2).longValueExact()
 }
 
-private fun parseCentsOrZero(value: String): Long = runCatching {
+internal fun parseCentsOrZero(value: String): Long = runCatching {
     parseEuroToCents(value, allowBlank = true)
 }.getOrDefault(0)
+
+internal fun formatCentsForInput(cents: Long): String =
+    BigDecimal(cents).movePointLeft(2).stripTrailingZeros().toPlainString()
