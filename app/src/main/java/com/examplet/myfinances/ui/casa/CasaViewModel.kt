@@ -111,9 +111,10 @@ class CasaViewModel @Inject constructor(
 
         CasaUiState(
             // The persisted flag still means "initial setup was completed".
-            // Planning readiness is stricter: if all categories/accounts are later archived,
-            // the UI must return to configuration instead of allowing an empty month plan.
-            isHouseSetupCompleted = core.isHouseSetupCompleted && hasPlanningPrerequisites,
+            // Active customization is required only to create a new plan. An existing
+            // month remains visible even if its categories/accounts are later archived.
+            isHouseSetupCompleted = core.isHouseSetupCompleted &&
+                (hasPlanningPrerequisites || plan != null),
             categories = core.categories,
             moneyAccounts = core.moneyAccounts,
             currentPlan = plan,
