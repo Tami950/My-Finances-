@@ -63,7 +63,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.androidx.compose.material.icons)
-    implementation(libs.accompanist.systemuicontroller)
+
     // Navigazione Compose
     implementation(libs.androidx.navigation.compose)
 
@@ -87,4 +87,3 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 }
-

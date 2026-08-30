@@ -1,20 +1,20 @@
 package com.examplet.myfinances.ui
 
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.examplet.myfinances.ui.components.AppTopBar
 import com.examplet.myfinances.ui.components.AppBottomBar
+import com.examplet.myfinances.ui.components.AppTopBar
 import com.examplet.myfinances.ui.navigation.AppNavHost
+import com.examplet.myfinances.ui.navigation.Route
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,9 +27,25 @@ fun AppScaffold() {
         contentWindowInsets = WindowInsets(0),
         topBar = { AppTopBar() },
         bottomBar = {
-            AppBottomBar(currentDestination = currentDest) { route -> nav.navigate(route) }
+            AppBottomBar(
+                currentDestination = currentDest,
+                onNavigate = { route ->
+                    nav.navigate(route) {
+                        launchSingleTop = true
+                        // Casa deve sempre ripartire dalla sua destinazione di default
+                        // quando viene riaperta dalla bottom navigation.
+                        restoreState = route != Route.Casa.route
+                        popUpTo(nav.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                    }
+                }
+            )
         }
     ) { inner ->
-        AppNavHost(navController = nav, modifier = Modifier.padding(inner))
+        AppNavHost(
+            navController = nav,
+            modifier = Modifier.padding(inner)
+        )
     }
 }
