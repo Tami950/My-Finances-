@@ -113,10 +113,12 @@ fun CreateHousePlanScreen(
                         Text(formatCents(rowTotalCents(row)))
                     }
                     val categoryDescription = when (row.category.type) {
-                        HouseCategoryType.FLEXIBLE -> stringResource(R.string.house_category_type_flexible)
+                        HouseCategoryType.FLEXIBLE ->
+                            stringResource(R.string.house_category_type_flexible)
+
                         HouseCategoryType.TARGET -> stringResource(
                             R.string.house_category_type_target,
-                            formatCents(row.category.targetCents ?: 0)
+                            formatPlainCents(row.category.targetCents ?: 0)
                         )
                     }
                     Text(categoryDescription, style = MaterialTheme.typography.bodySmall)
@@ -136,12 +138,27 @@ fun CreateHousePlanScreen(
             item(key = "summary-divider") { HorizontalDivider() }
             item(key = "summary") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.house_plan_summary), style = MaterialTheme.typography.titleMedium)
-                    SummaryRow(stringResource(R.string.house_summary_resources), state.totalResourcesCents)
-                    SummaryRow(stringResource(R.string.house_summary_allocated), state.allocatedCents)
-                    SummaryRow(stringResource(R.string.house_summary_unallocated), state.unallocatedCents)
+                    Text(
+                        stringResource(R.string.house_plan_summary),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    SummaryRow(
+                        stringResource(R.string.house_summary_resources),
+                        state.totalResourcesCents
+                    )
+                    SummaryRow(
+                        stringResource(R.string.house_summary_allocated),
+                        state.allocatedCents
+                    )
+                    SummaryRow(
+                        stringResource(R.string.house_summary_unallocated),
+                        state.unallocatedCents
+                    )
                     if (state.openingBalanceCents > 0) {
-                        SummaryRow(stringResource(R.string.house_summary_opening), state.openingBalanceCents)
+                        SummaryRow(
+                            stringResource(R.string.house_summary_opening),
+                            state.openingBalanceCents
+                        )
                     }
                     if (state.hasAllocationOverflow) {
                         Text(
@@ -183,8 +200,14 @@ fun CreateHousePlanScreen(
 
             item(key = "position-summary") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    SummaryRow(stringResource(R.string.house_summary_positioned), state.positionedCents)
-                    SummaryRow(stringResource(R.string.house_summary_unpositioned), state.unpositionedCents)
+                    SummaryRow(
+                        stringResource(R.string.house_summary_positioned),
+                        state.positionedCents
+                    )
+                    SummaryRow(
+                        stringResource(R.string.house_summary_unpositioned),
+                        state.unpositionedCents
+                    )
                     if (state.hasPositionOverflow) {
                         Text(
                             stringResource(
@@ -212,7 +235,8 @@ fun CreateHousePlanScreen(
                 ) {
                     Text(
                         stringResource(
-                            if (state.isSaving) R.string.action_saving else R.string.house_save_plan
+                            if (state.isSaving) R.string.action_saving
+                            else R.string.house_save_plan
                         )
                     )
                 }
@@ -317,7 +341,8 @@ internal fun monthLabel(month: Int, year: Int): String {
 }
 
 private fun rowTotalCents(row: HousePlanCategoryDraftUi): Long =
-    parseCentsOrZeroLocal(row.openingBalanceText) + parseCentsOrZeroLocal(row.allocatedText)
+    parseCentsOrZeroLocal(row.openingBalanceText) +
+        parseCentsOrZeroLocal(row.allocatedText)
 
 private fun parseCentsOrZeroLocal(value: String): Long = runCatching {
     val normalized = value.trim().replace(',', '.')
@@ -334,3 +359,11 @@ internal fun formatHouseCents(cents: Long): String {
 }
 
 private fun formatCents(cents: Long): String = formatHouseCents(cents)
+
+private fun formatPlainCents(cents: Long): String {
+    val formatter = NumberFormat.getNumberInstance(Locale.ITALY).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
+    return formatter.format(BigDecimal(cents).movePointLeft(2))
+}
