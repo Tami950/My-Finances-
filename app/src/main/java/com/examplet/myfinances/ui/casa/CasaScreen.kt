@@ -3,6 +3,7 @@ package com.examplet.myfinances.ui.casa
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.examplet.myfinances.R
 import com.examplet.myfinances.domain.model.HouseCategory
 import com.examplet.myfinances.domain.model.HouseCategoryType
+import com.examplet.myfinances.domain.model.HousePlanSummary
 import com.examplet.myfinances.domain.model.MoneyAccount
 import com.examplet.myfinances.domain.model.MoneyAccountType
 import com.examplet.myfinances.ui.components.AppModalBottomSheet
@@ -47,7 +49,10 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
-fun CasaScreen(viewModel: CasaViewModel = hiltViewModel()) {
+fun CasaScreen(
+    onCreatePlan: () -> Unit,
+    viewModel: CasaViewModel = hiltViewModel()
+) {
     val state by viewModel.uiState.collectAsState()
 
     AppScreen {
@@ -68,9 +73,10 @@ fun CasaScreen(viewModel: CasaViewModel = hiltViewModel()) {
             when (state.selectedTab) {
                 CasaTab.PLANNING -> PlanningContent(
                     setupCompleted = state.isHouseSetupCompleted,
-                    onConfigure = viewModel::startHouseSetup
+                    currentPlan = state.currentPlan,
+                    onConfigure = viewModel::startHouseSetup,
+                    onCreatePlan = onCreatePlan
                 )
-
                 CasaTab.CUSTOMIZATION -> CustomizationContent(
                     state = state,
                     onAddCategory = viewModel::openNewCategory,
@@ -114,41 +120,92 @@ fun CasaScreen(viewModel: CasaViewModel = hiltViewModel()) {
 @Composable
 private fun PlanningContent(
     setupCompleted: Boolean,
-    onConfigure: () -> Unit
+    currentPlan: HousePlanSummary?,
+    onConfigure: () -> Unit,
+    onCreatePlan: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (!setupCompleted) {
+    if (!setupCompleted) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(stringResource(R.string.house_setup_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.house_setup_description))
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onConfigure) {
-                Text(stringResource(R.string.house_setup_action))
-            }
-        } else {
-            val month = LocalDate.now().format(
-                DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ITALIAN)
-            )
+            Button(onClick = onConfigure) { Text(stringResource(R.string.house_setup_action)) }
+        }
+        return
+    }
+
+    val month = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ITALIAN))
+        .replaceFirstChar { it.uppercase() }
+
+    if (currentPlan == null) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                stringResource(
-                    R.string.house_planning_empty_title,
-                    month.replaceFirstChar { it.uppercase() }
-                ),
+                stringResource(R.string.house_planning_empty_title, month),
                 style = MaterialTheme.typography.headlineSmall
             )
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.house_planning_empty_description))
             Spacer(Modifier.height(24.dp))
-            Button(onClick = {}, enabled = false) {
-                Text(stringResource(R.string.house_plan_month))
+            Button(onClick = onCreatePlan) { Text(stringResource(R.string.house_plan_month)) }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Text(month, style = MaterialTheme.typography.headlineSmall)
+            }
+            item {
+                PlanningSummaryRow(
+                    stringResource(R.string.house_summary_resources),
+                    currentPlan.totalResourcesCents
+                )
+            }
+            item {
+                PlanningSummaryRow(
+                    stringResource(R.string.house_summary_allocated),
+                    currentPlan.allocatedCents
+                )
+            }
+            item {
+                PlanningSummaryRow(
+                    stringResource(R.string.house_summary_unallocated),
+                    currentPlan.unallocatedCents
+                )
+            }
+            item { HorizontalDivider() }
+            item {
+                PlanningSummaryRow(
+                    stringResource(R.string.house_summary_positioned),
+                    currentPlan.positionedCents
+                )
+            }
+            item {
+                PlanningSummaryRow(
+                    stringResource(R.string.house_summary_unpositioned),
+                    currentPlan.unpositionedCents
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun PlanningSummaryRow(label: String, cents: Long) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(label, modifier = Modifier.weight(1f))
+        Text(formatCentsCurrency(cents))
     }
 }
 
@@ -167,29 +224,20 @@ private fun CustomizationContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item(key = "categories-title") {
-            Text(
-                stringResource(R.string.house_categories_title),
-                style = MaterialTheme.typography.titleLarge
-            )
+            Text(stringResource(R.string.house_categories_title), style = MaterialTheme.typography.titleLarge)
         }
-
         if (state.categories.isEmpty()) {
-            item(key = "categories-empty") {
-                Text(stringResource(R.string.house_categories_empty))
-            }
+            item(key = "categories-empty") { Text(stringResource(R.string.house_categories_empty)) }
         }
-
         items(state.categories, key = { "category-${it.id}" }) { category ->
             ManagerRow(
                 title = category.name,
                 subtitle = when (category.type) {
-                    HouseCategoryType.FLEXIBLE ->
-                        stringResource(R.string.house_category_type_flexible)
-
+                    HouseCategoryType.FLEXIBLE -> stringResource(R.string.house_category_type_flexible)
                     HouseCategoryType.TARGET -> stringResource(
                         R.string.house_category_type_target,
                         formatCents(category.targetCents ?: 0)
@@ -201,31 +249,19 @@ private fun CustomizationContent(
                 onReactivate = { onReactivateCategory(category.id) }
             )
         }
-
         item(key = "category-add") {
-            OutlinedButton(onClick = onAddCategory) {
-                Text(stringResource(R.string.house_add_category))
-            }
+            OutlinedButton(onClick = onAddCategory) { Text(stringResource(R.string.house_add_category)) }
         }
-
         item(key = "manager-divider") {
             HorizontalDivider()
             Spacer(Modifier.height(4.dp))
         }
-
         item(key = "accounts-title") {
-            Text(
-                stringResource(R.string.house_accounts_title),
-                style = MaterialTheme.typography.titleLarge
-            )
+            Text(stringResource(R.string.house_accounts_title), style = MaterialTheme.typography.titleLarge)
         }
-
         if (state.moneyAccounts.isEmpty()) {
-            item(key = "accounts-empty") {
-                Text(stringResource(R.string.house_accounts_empty))
-            }
+            item(key = "accounts-empty") { Text(stringResource(R.string.house_accounts_empty)) }
         }
-
         items(state.moneyAccounts, key = { "account-${it.id}" }) { account ->
             ManagerRow(
                 title = account.name,
@@ -236,21 +272,14 @@ private fun CustomizationContent(
                 onReactivate = { onReactivateAccount(account.id) }
             )
         }
-
         item(key = "account-add") {
-            OutlinedButton(onClick = onAddAccount) {
-                Text(stringResource(R.string.house_add_account))
-            }
+            OutlinedButton(onClick = onAddAccount) { Text(stringResource(R.string.house_add_account)) }
         }
-
         if (!state.isHouseSetupCompleted) {
             item(key = "setup-complete") {
                 Spacer(Modifier.height(12.dp))
                 if (!state.canCompleteSetup) {
-                    Text(
-                        stringResource(R.string.house_setup_requirement),
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text(stringResource(R.string.house_setup_requirement), style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
                 }
                 Button(
@@ -285,20 +314,12 @@ private fun ManagerRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
-                if (isArchived) {
-                    "$subtitle · ${stringResource(R.string.house_archived)}"
-                } else {
-                    subtitle
-                },
+                if (isArchived) "$subtitle · ${stringResource(R.string.house_archived)}" else subtitle,
                 style = MaterialTheme.typography.bodySmall
             )
         }
         TextButton(onClick = if (isArchived) onReactivate else onArchive) {
-            Text(
-                stringResource(
-                    if (isArchived) R.string.house_reactivate else R.string.house_archive
-                )
-            )
+            Text(stringResource(if (isArchived) R.string.house_reactivate else R.string.house_archive))
         }
     }
 }
@@ -317,20 +338,13 @@ private fun CategorySheet(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                stringResource(
-                    if (draft.id == null) R.string.house_add_category
-                    else R.string.house_edit_category
-                ),
+                stringResource(if (draft.id == null) R.string.house_add_category else R.string.house_edit_category),
                 style = MaterialTheme.typography.titleLarge
             )
         },
         actions = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-            Button(onClick = onSave) {
-                Text(stringResource(R.string.action_save))
-            }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            Button(onClick = onSave) { Text(stringResource(R.string.action_save)) }
         }
     ) {
         OutlinedTextField(
@@ -340,21 +354,12 @@ private fun CategorySheet(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-
-        ChoiceRow(
-            stringResource(R.string.house_category_flexible),
-            draft.type == HouseCategoryType.FLEXIBLE
-        ) {
+        ChoiceRow(stringResource(R.string.house_category_flexible), draft.type == HouseCategoryType.FLEXIBLE) {
             onTypeChange(HouseCategoryType.FLEXIBLE)
         }
-
-        ChoiceRow(
-            stringResource(R.string.house_category_target),
-            draft.type == HouseCategoryType.TARGET
-        ) {
+        ChoiceRow(stringResource(R.string.house_category_target), draft.type == HouseCategoryType.TARGET) {
             onTypeChange(HouseCategoryType.TARGET)
         }
-
         if (draft.type == HouseCategoryType.TARGET) {
             OutlinedTextField(
                 value = draft.targetText,
@@ -365,10 +370,7 @@ private fun CategorySheet(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-
-        errorMessage?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
+        errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 
@@ -385,20 +387,13 @@ private fun MoneyAccountSheet(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                stringResource(
-                    if (draft.id == null) R.string.house_add_account
-                    else R.string.house_edit_account
-                ),
+                stringResource(if (draft.id == null) R.string.house_add_account else R.string.house_edit_account),
                 style = MaterialTheme.typography.titleLarge
             )
         },
         actions = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-            Button(onClick = onSave) {
-                Text(stringResource(R.string.action_save))
-            }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            Button(onClick = onSave) { Text(stringResource(R.string.action_save)) }
         }
     ) {
         OutlinedTextField(
@@ -408,32 +403,17 @@ private fun MoneyAccountSheet(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-
         MoneyAccountType.entries.forEach { type ->
-            ChoiceRow(
-                moneyAccountTypeLabel(type),
-                draft.type == type
-            ) {
-                onTypeChange(type)
-            }
+            ChoiceRow(moneyAccountTypeLabel(type), draft.type == type) { onTypeChange(type) }
         }
-
-        errorMessage?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
+        errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 
 @Composable
-private fun ChoiceRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
+private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(selected = selected, onClick = onClick)
@@ -456,3 +436,7 @@ private fun formatCents(cents: Long): String {
     }
     return formatter.format(BigDecimal(cents).movePointLeft(2))
 }
+
+private fun formatCentsCurrency(cents: Long): String =
+    NumberFormat.getCurrencyInstance(Locale.ITALY)
+        .format(BigDecimal(cents).movePointLeft(2))
