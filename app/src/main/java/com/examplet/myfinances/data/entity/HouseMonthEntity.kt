@@ -3,6 +3,7 @@ package com.examplet.myfinances.data.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.examplet.myfinances.domain.model.HouseMonthStatus
 
 @Entity(
     tableName = "house_months",
@@ -15,6 +16,8 @@ data class HouseMonthEntity(
     val month: Int,
     val totalResourcesCents: Long,
     val note: String? = null,
+    val status: HouseMonthStatus = HouseMonthStatus.OPEN,
+    val closedAt: Long? = null,
     val createdAt: Long,
     val updatedAt: Long
 )
