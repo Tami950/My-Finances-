@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -123,7 +124,10 @@ private fun PlanningContent(
             Button(onClick = onConfigure) { Text(stringResource(R.string.house_setup_action)) }
         } else {
             val month = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ITALIAN))
-            Text(stringResource(R.string.house_planning_empty_title, month.replaceFirstChar { it.uppercase() }), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                stringResource(R.string.house_planning_empty_title, month.replaceFirstChar { it.uppercase() }),
+                style = MaterialTheme.typography.headlineSmall
+            )
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.house_planning_empty_description))
             Spacer(Modifier.height(24.dp))
@@ -157,7 +161,10 @@ private fun CustomizationContent(
                 title = category.name,
                 subtitle = when (category.type) {
                     HouseCategoryType.FLEXIBLE -> stringResource(R.string.house_category_type_flexible)
-                    HouseCategoryType.TARGET -> stringResource(R.string.house_category_type_target, formatCents(category.targetCents ?: 0))
+                    HouseCategoryType.TARGET -> stringResource(
+                        R.string.house_category_type_target,
+                        formatCents(category.targetCents ?: 0)
+                    )
                 },
                 onClick = { onEditCategory(category) },
                 onArchive = { onArchiveCategory(category.id) }
@@ -187,7 +194,11 @@ private fun CustomizationContent(
                     Text(stringResource(R.string.house_setup_requirement), style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
                 }
-                Button(onClick = onCompleteSetup, enabled = state.canCompleteSetup, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onCompleteSetup,
+                    enabled = state.canCompleteSetup,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(stringResource(R.string.house_setup_complete))
                 }
             }
@@ -227,9 +238,18 @@ private fun CategoryDialog(
         title = { Text(stringResource(if (draft.id == null) R.string.house_add_category else R.string.house_edit_category)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = draft.name, onValueChange = onNameChange, label = { Text(stringResource(R.string.house_category_name)) }, singleLine = true)
-                ChoiceRow(stringResource(R.string.house_category_flexible), draft.type == HouseCategoryType.FLEXIBLE) { onTypeChange(HouseCategoryType.FLEXIBLE) }
-                ChoiceRow(stringResource(R.string.house_category_target), draft.type == HouseCategoryType.TARGET) { onTypeChange(HouseCategoryType.TARGET) }
+                OutlinedTextField(
+                    value = draft.name,
+                    onValueChange = onNameChange,
+                    label = { Text(stringResource(R.string.house_category_name)) },
+                    singleLine = true
+                )
+                ChoiceRow(stringResource(R.string.house_category_flexible), draft.type == HouseCategoryType.FLEXIBLE) {
+                    onTypeChange(HouseCategoryType.FLEXIBLE)
+                }
+                ChoiceRow(stringResource(R.string.house_category_target), draft.type == HouseCategoryType.TARGET) {
+                    onTypeChange(HouseCategoryType.TARGET)
+                }
                 if (draft.type == HouseCategoryType.TARGET) {
                     OutlinedTextField(
                         value = draft.targetText,
@@ -261,7 +281,12 @@ private fun MoneyAccountDialog(
         title = { Text(stringResource(if (draft.id == null) R.string.house_add_account else R.string.house_edit_account)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = draft.name, onValueChange = onNameChange, label = { Text(stringResource(R.string.house_account_name)) }, singleLine = true)
+                OutlinedTextField(
+                    value = draft.name,
+                    onValueChange = onNameChange,
+                    label = { Text(stringResource(R.string.house_account_name)) },
+                    singleLine = true
+                )
                 MoneyAccountType.entries.forEach { type ->
                     ChoiceRow(moneyAccountTypeLabel(type), draft.type == type) { onTypeChange(type) }
                 }
