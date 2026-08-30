@@ -5,13 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.examplet.myfinances.data.repository.AppPreferencesRepository
 import com.examplet.myfinances.domain.model.HouseCategory
 import com.examplet.myfinances.domain.model.HouseCategoryType
+import com.examplet.myfinances.domain.model.HousePlanSummary
 import com.examplet.myfinances.domain.model.MoneyAccount
 import com.examplet.myfinances.domain.model.MoneyAccountType
 import com.examplet.myfinances.domain.repository.HouseCategoryRepository
+import com.examplet.myfinances.domain.repository.HousePlanRepository
 import com.examplet.myfinances.domain.repository.MoneyAccountRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +42,7 @@ data class CasaUiState(
     val isHouseSetupCompleted: Boolean = false,
     val categories: List<HouseCategory> = emptyList(),
     val moneyAccounts: List<MoneyAccount> = emptyList(),
+    val currentPlan: HousePlanSummary? = null,
     val selectedTab: CasaTab = CasaTab.PLANNING,
     val categoryDraft: CategoryDraft? = null,
     val moneyAccountDraft: MoneyAccountDraft? = null,
@@ -60,6 +64,7 @@ private data class CoreCasaState(
 class CasaViewModel @Inject constructor(
     private val categoryRepository: HouseCategoryRepository,
     private val moneyAccountRepository: MoneyAccountRepository,
+    private val housePlanRepository: HousePlanRepository,
     private val appPreferencesRepository: AppPreferencesRepository
 ) : ViewModel() {
 
@@ -67,6 +72,7 @@ class CasaViewModel @Inject constructor(
     private val categoryDraft = MutableStateFlow<CategoryDraft?>(null)
     private val moneyAccountDraft = MutableStateFlow<MoneyAccountDraft?>(null)
     private val errorMessage = MutableStateFlow<String?>(null)
+    private val currentDate = LocalDate.now()
 
     private val coreState = combine(
         appPreferencesRepository.isHouseSetupCompleted,
@@ -78,15 +84,22 @@ class CasaViewModel @Inject constructor(
         CoreCasaState(setupCompleted, categories, accounts, tab, category)
     }
 
+    private val currentPlan = housePlanRepository.observeSummary(
+        year = currentDate.year,
+        month = currentDate.monthValue
+    )
+
     val uiState: StateFlow<CasaUiState> = combine(
         coreState,
         moneyAccountDraft,
-        errorMessage
-    ) { core, accountDraft, error ->
+        errorMessage,
+        currentPlan
+    ) { core, accountDraft, error, plan ->
         CasaUiState(
             isHouseSetupCompleted = core.isHouseSetupCompleted,
             categories = core.categories,
             moneyAccounts = core.moneyAccounts,
+            currentPlan = plan,
             selectedTab = core.selectedTab,
             categoryDraft = core.categoryDraft,
             moneyAccountDraft = accountDraft,
