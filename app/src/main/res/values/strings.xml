@@ -30,6 +30,8 @@
     <string name="house_category_type_flexible">Libera</string>
     <string name="house_category_type_target">Obiettivo: %1$s €</string>
     <string name="house_archive">Archivia</string>
+    <string name="house_reactivate">Riattiva</string>
+    <string name="house_archived">Archiviata</string>
 
     <string name="house_accounts_title">Posizioni del denaro</string>
     <string name="house_accounts_empty">Non hai ancora creato money account.</string>
