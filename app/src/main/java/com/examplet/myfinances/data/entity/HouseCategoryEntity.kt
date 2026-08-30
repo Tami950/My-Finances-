@@ -9,5 +9,7 @@ data class HouseCategoryEntity(
     val id: Long = 0,
     val name: String,
     val sortOrder: Int = 0,
-    val isArchived: Boolean = false
+    val isArchived: Boolean = false,
+    val createdAt: Long,
+    val updatedAt: Long
 )
