@@ -22,7 +22,7 @@ import com.examplet.myfinances.data.entity.MoneyAccountEntity
         HouseMonthlyAllocationEntity::class,
         HouseMonthAccountBalanceEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
