@@ -66,21 +66,25 @@ Campi correnti:
 - month: Int
 - totalResourcesCents: Long
 - note: String?
+- status: HouseMonthStatus
+- closedAt: Long?
 - createdAt: Long
 - updatedAt: Long
+
+HouseMonthStatus:
+- OPEN
+- CLOSED
 
 Vincolo unico:
 - (year, month)
 
-Estensione NECESSARIA prossima:
-- status: HouseMonthStatus = OPEN/CLOSED
-- closedAt: Long?
-
 Regole:
 - un solo mese per coppia anno/mese;
 - totalResourcesCents >= 0;
-- CLOSED implica mese storico e normalmente non modificabile;
-- non creare il mese successivo se il precedente esiste ed e' OPEN.
+- un nuovo mese nasce OPEN;
+- CLOSED implica mese storico e non modificabile dai flussi ordinari;
+- non creare il mese successivo se il precedente esiste ed e' OPEN;
+- closedAt resta null per OPEN e verra' valorizzato dal futuro flusso di chiusura mese.
 
 ### 2.4 house_monthly_allocations
 Campi:
@@ -119,7 +123,8 @@ Regole:
 - amountCents >= 0;
 - somma amountCents <= totalResourcesCents;
 - differenza positiva = denaro Casa ancora non posizionato/riconciliato;
-- nessun euro deve essere contato contemporaneamente su due posizioni.
+- nessun euro deve essere contato contemporaneamente su due posizioni;
+- una posizione a zero puo' non avere una riga persistita.
 
 ## 3. Opening balance e mese precedente
 Obiettivo definitivo:
@@ -132,15 +137,16 @@ Per calcolare il residuo finale servira' il modello movimenti/spese e/o la chius
 La chiusura mese deve avvenire prima della pianificazione del mese successivo quando il mese precedente esiste.
 
 ## 4. Stato mese
-Nuovo tipo previsto:
+HouseMonthStatus e' ora persistito direttamente in house_months.
 
-HouseMonthStatus:
-- OPEN
-- CLOSED
-
-Persistenza consigliata direttamente in house_months.
+Regole implementate:
+- createPlan crea sempre il mese in stato OPEN;
+- updatePlan e updatePositions rifiutano mesi CLOSED;
+- createPlan controlla il mese precedente: se esiste ed e' OPEN, la nuova pianificazione viene rifiutata.
 
 Non usare DataStore/AppPreferences per isHouseMonthClosed, perche' la chiusura e' una proprieta' storica di ogni singolo mese.
+
+La transizione OPEN -> CLOSED e la valorizzazione di closedAt verranno implementate con il flusso di chiusura mese.
 
 ## 5. Categoria nascosta dal mese
 Requisito nuovo: una categoria globale puo' essere nascosta/esclusa da uno specifico mese senza archiviarla globalmente.
@@ -233,7 +239,20 @@ Creazione del piano:
 
 devono avvenire in una sola transazione Room.
 
-Anche le modifiche composite e i futuri trasferimenti tra posizioni devono essere atomici.
+Modifica pianificazione esistente:
+- update house_months;
+- update delle allocazioni mensili interessate;
+- validazione delle posizioni gia' esistenti rispetto alle nuove risorse;
+
+deve essere atomica.
+
+Modifica posizioni:
+- insert/update/delete dei singoli house_month_account_balances;
+- validazione della somma rispetto alle risorse del mese;
+
+deve essere atomica e separata dalla modifica della pianificazione logica.
+
+Anche i futuri trasferimenti tra posizioni devono essere atomici.
 
 ## 11. Invarianti di dominio
 - denaro mai negativo;
@@ -245,15 +264,21 @@ Anche le modifiche composite e i futuri trasferimenti tra posizioni devono esser
 - la posizione fisica non rappresenta la cronologia;
 - i movimenti tra posizioni conservano il totale.
 
+Le validazioni vengono applicate sia nello stato UI/ViewModel per feedback immediato sia nel repository prima della scrittura Room.
+
 ## 12. Migrazioni
-Durante lo sviluppo iniziale fallbackToDestructiveMigration() e' ancora temporaneamente accettato per dati di test.
+Database Room corrente: versione 5.
+
+La versione 5 introduce in house_months:
+- status;
+- closedAt.
+
+Durante lo sviluppo iniziale fallbackToDestructiveMigration() e' ancora temporaneamente accettato per dati di test. Il passaggio alla versione 5 puo' quindi cancellare il database locale di sviluppo.
 
 Prima dell'uso reale:
 - rimuovere fallback distruttivo;
 - abilitare export schema;
 - scrivere migrazioni Room esplicite.
-
-La prossima modifica di schema prevista e' l'aggiunta di status/closedAt a house_months e richiedera' un nuovo database version bump.
 
 ## 13. Nota su ID e cloud futuro
 Lo schema usa attualmente PK Long autoGenerate.
