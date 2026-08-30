@@ -1,7 +1,6 @@
 package com.examplet.myfinances.ui.casa
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,13 +19,6 @@ private object CasaRoute {
 @Composable
 fun CasaNavHost() {
     val navController = rememberNavController()
-
-    LaunchedEffect(Unit) {
-        navController.navigate(CasaRoute.HOME) {
-            popUpTo(CasaRoute.HOME) { inclusive = false }
-            launchSingleTop = true
-        }
-    }
 
     NavHost(
         navController = navController,
