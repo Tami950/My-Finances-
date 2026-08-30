@@ -21,10 +21,13 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Category name cannot be blank" }
 
+        val now = System.currentTimeMillis()
         return houseCategoryDao.insert(
             HouseCategoryEntity(
                 name = normalizedName,
-                sortOrder = sortOrder
+                sortOrder = sortOrder,
+                createdAt = now,
+                updatedAt = now
             )
         )
     }
@@ -32,11 +35,11 @@ class HouseCategoryRepositoryImpl @Inject constructor(
     override suspend fun renameCategory(id: Long, name: String) {
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Category name cannot be blank" }
-        houseCategoryDao.rename(id, normalizedName)
+        houseCategoryDao.rename(id, normalizedName, System.currentTimeMillis())
     }
 
     override suspend fun setCategoryArchived(id: Long, isArchived: Boolean) {
-        houseCategoryDao.setArchived(id, isArchived)
+        houseCategoryDao.setArchived(id, isArchived, System.currentTimeMillis())
     }
 }
 
