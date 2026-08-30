@@ -25,7 +25,10 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         sortOrder: Int
     ): Long {
         val normalizedName = name.trim()
-        require(normalizedName.isNotEmpty()) { "Category name cannot be blank" }
+        require(normalizedName.isNotEmpty()) { "Il nome della categoria non può essere vuoto" }
+        require(houseCategoryDao.countByName(normalizedName) == 0) {
+            "Esiste già una categoria con questo nome"
+        }
         validateTarget(type, targetCents)
 
         val now = System.currentTimeMillis()
@@ -48,10 +51,13 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         targetCents: Long?
     ) {
         val normalizedName = name.trim()
-        require(normalizedName.isNotEmpty()) { "Category name cannot be blank" }
+        require(normalizedName.isNotEmpty()) { "Il nome della categoria non può essere vuoto" }
+        require(houseCategoryDao.countByName(normalizedName, excludeId = id) == 0) {
+            "Esiste già una categoria con questo nome"
+        }
         validateTarget(type, targetCents)
 
-        val current = requireNotNull(houseCategoryDao.getById(id)) { "Category not found" }
+        val current = requireNotNull(houseCategoryDao.getById(id)) { "Categoria non trovata" }
         houseCategoryDao.update(
             current.copy(
                 name = normalizedName,
@@ -68,7 +74,9 @@ class HouseCategoryRepositoryImpl @Inject constructor(
 
     private fun validateTarget(type: HouseCategoryType, targetCents: Long?) {
         if (type == HouseCategoryType.TARGET) {
-            require(targetCents != null && targetCents > 0) { "Target category requires a positive target" }
+            require(targetCents != null && targetCents > 0) {
+                "Una categoria con obiettivo richiede un importo maggiore di zero"
+            }
         }
     }
 
