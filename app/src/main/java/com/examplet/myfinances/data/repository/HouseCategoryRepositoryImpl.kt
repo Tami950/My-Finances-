@@ -3,6 +3,7 @@ package com.examplet.myfinances.data.repository
 import com.examplet.myfinances.data.dao.HouseCategoryDao
 import com.examplet.myfinances.data.entity.HouseCategoryEntity
 import com.examplet.myfinances.domain.model.HouseCategory
+import com.examplet.myfinances.domain.model.HouseCategoryType
 import com.examplet.myfinances.domain.repository.HouseCategoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -17,14 +18,22 @@ class HouseCategoryRepositoryImpl @Inject constructor(
             categories.map(HouseCategoryEntity::toDomain)
         }
 
-    override suspend fun createCategory(name: String, sortOrder: Int): Long {
+    override suspend fun createCategory(
+        name: String,
+        type: HouseCategoryType,
+        targetCents: Long?,
+        sortOrder: Int
+    ): Long {
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Category name cannot be blank" }
+        validateTarget(type, targetCents)
 
         val now = System.currentTimeMillis()
         return houseCategoryDao.insert(
             HouseCategoryEntity(
                 name = normalizedName,
+                type = type,
+                targetCents = normalizedTarget(type, targetCents),
                 sortOrder = sortOrder,
                 createdAt = now,
                 updatedAt = now
@@ -32,20 +41,46 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun renameCategory(id: Long, name: String) {
+    override suspend fun updateCategory(
+        id: Long,
+        name: String,
+        type: HouseCategoryType,
+        targetCents: Long?
+    ) {
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Category name cannot be blank" }
-        houseCategoryDao.rename(id, normalizedName, System.currentTimeMillis())
+        validateTarget(type, targetCents)
+
+        val current = requireNotNull(houseCategoryDao.getById(id)) { "Category not found" }
+        houseCategoryDao.update(
+            current.copy(
+                name = normalizedName,
+                type = type,
+                targetCents = normalizedTarget(type, targetCents),
+                updatedAt = System.currentTimeMillis()
+            )
+        )
     }
 
     override suspend fun setCategoryArchived(id: Long, isArchived: Boolean) {
         houseCategoryDao.setArchived(id, isArchived, System.currentTimeMillis())
     }
+
+    private fun validateTarget(type: HouseCategoryType, targetCents: Long?) {
+        if (type == HouseCategoryType.TARGET) {
+            require(targetCents != null && targetCents > 0) { "Target category requires a positive target" }
+        }
+    }
+
+    private fun normalizedTarget(type: HouseCategoryType, targetCents: Long?): Long? =
+        if (type == HouseCategoryType.TARGET) targetCents else null
 }
 
 private fun HouseCategoryEntity.toDomain() = HouseCategory(
     id = id,
     name = name,
+    type = type,
+    targetCents = targetCents,
     sortOrder = sortOrder,
     isArchived = isArchived
 )
