@@ -76,6 +76,8 @@ data class CreateHousePlanUiState(
 
     val canSave: Boolean
         get() = !isSaving &&
+            categories.isNotEmpty() &&
+            accounts.isNotEmpty() &&
             totalResourcesCents > 0 &&
             !hasAllocationOverflow &&
             !hasPositionOverflow
@@ -176,6 +178,8 @@ class CreateHousePlanViewModel @Inject constructor(
                 val state = _uiState.value
                 val totalResourcesCents = parseEuroToCents(state.totalResourcesText, allowBlank = false)
                 require(totalResourcesCents > 0) { "Inserisci risorse del mese maggiori di zero" }
+                require(state.categories.isNotEmpty()) { "Serve almeno una categoria Casa attiva" }
+                require(state.accounts.isNotEmpty()) { "Serve almeno una posizione del denaro attiva" }
 
                 val allocations = state.categories.map { row ->
                     HousePlanAllocationDraft(
