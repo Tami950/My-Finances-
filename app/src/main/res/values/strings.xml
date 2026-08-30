@@ -10,7 +10,7 @@
     <string name="house_tab_planning">Pianificazione</string>
     <string name="house_tab_customization">Personalizzazione</string>
     <string name="house_setup_title">Configura le finanze di Casa</string>
-    <string name="house_setup_description">Prima di creare la prima pianificazione, imposta almeno una categoria e una posizione del denaro.</string>
+    <string name="house_setup_description">Per pianificare Casa servono almeno una categoria e una posizione del denaro attive.</string>
     <string name="house_setup_action">Configura Casa</string>
     <string name="house_setup_complete">Completa configurazione</string>
     <string name="house_setup_requirement">Per completare il setup servono almeno una categoria e un money account attivi.</string>
@@ -35,7 +35,7 @@
     <string name="house_save_plan">Salva pianificazione</string>
     <string name="house_summary_resources">Risorse</string>
     <string name="house_summary_allocated">Allocato</string>
-    <string name="house_summary_unallocated">Da allocare</string>
+    <string name="house_summary_unallocated">Disponibile</string>
     <string name="house_summary_opening">Residui iniziali</string>
     <string name="house_summary_positioned">Posizionato</string>
     <string name="house_summary_unpositioned">Da posizionare</string>
@@ -80,4 +80,5 @@
     <string name="action_back">Indietro</string>
     <string name="action_done">Fatto</string>
     <string name="action_saving">Salvataggio…</string>
+    <string name="action_clear_amount">Azzera importo</string>
 </resources>
