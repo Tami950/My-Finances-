@@ -19,6 +19,7 @@ import com.examplet.myfinances.domain.repository.HousePlanRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class HousePlanRepositoryImpl @Inject constructor(
@@ -85,6 +86,8 @@ class HousePlanRepositoryImpl @Inject constructor(
         validateDraft(draft)
 
         return database.withTransaction {
+            requirePreviousMonthClosed(draft.year, draft.month)
+
             val now = System.currentTimeMillis()
             val houseMonthId = houseMonthDao.insert(
                 HouseMonthEntity(
@@ -137,7 +140,7 @@ class HousePlanRepositoryImpl @Inject constructor(
             val month = requireOpenMonth(houseMonthId)
             val currentPositioned = accountBalanceDao
                 .observeForMonth(houseMonthId)
-                .firstValue()
+                .first()
                 .sumOf { it.amountCents }
             require(currentPositioned <= draft.totalResourcesCents) {
                 "Le posizioni attuali superano le nuove risorse del mese"
@@ -224,6 +227,15 @@ class HousePlanRepositoryImpl @Inject constructor(
         return month
     }
 
+    private suspend fun requirePreviousMonthClosed(year: Int, month: Int) {
+        val previousYear = if (month == 1) year - 1 else year
+        val previousMonth = if (month == 1) 12 else month - 1
+        val previous = houseMonthDao.getByYearMonth(previousYear, previousMonth) ?: return
+        require(previous.status == HouseMonthStatus.CLOSED) {
+            "Prima di pianificare questo mese devi chiudere il mese precedente"
+        }
+    }
+
     private fun validateDraft(draft: HousePlanDraft, validatePositions: Boolean = true) {
         require(draft.month in 1..12) { "Mese non valido" }
         require(draft.totalResourcesCents > 0) { "Le risorse del mese devono essere maggiori di zero" }
@@ -249,5 +261,3 @@ class HousePlanRepositoryImpl @Inject constructor(
 
     private fun normalizedNote(note: String?): String? = note?.trim()?.takeIf { it.isNotEmpty() }
 }
-
-private suspend fun <T> Flow<List<T>>.firstValue(): List<T> = kotlinx.coroutines.flow.first(this)
