@@ -3,7 +3,9 @@ package com.examplet.myfinances.ui.casa
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.examplet.myfinances.data.repository.AppPreferencesRepository
+import com.examplet.myfinances.domain.model.FixedExpensePending
 import com.examplet.myfinances.domain.model.HouseCategory
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 import com.examplet.myfinances.domain.model.HousePlanDetails
 import com.examplet.myfinances.domain.model.HousePlanSummary
@@ -32,7 +34,8 @@ data class CategoryDraft(
     val id: Long? = null,
     val name: String = "",
     val type: HouseCategoryType = HouseCategoryType.FLEXIBLE,
-    val targetText: String = ""
+    val targetText: String = "",
+    val isFixedExpense: Boolean = false
 )
 
 data class MoneyAccountDraft(
@@ -49,6 +52,7 @@ data class CasaUiState(
     val currentPlan: HousePlanSummary? = null,
     val previousPlan: HousePlanSummary? = null,
     val currentPlanDetails: HousePlanDetails? = null,
+    val pendingFixedExpenses: List<FixedExpensePending> = emptyList(),
     val selectedTab: CasaTab = CasaTab.PLANNING,
     val categoryDraft: CategoryDraft? = null,
     val moneyAccountDraft: MoneyAccountDraft? = null,
@@ -118,19 +122,16 @@ class CasaViewModel @Inject constructor(
         previousPlan,
         currentPlanDetails
     ) { current, previous, details ->
-        TemporalCasaState(
-            currentPlan = current,
-            previousPlan = previous,
-            currentPlanDetails = details
-        )
+        TemporalCasaState(current, previous, details)
     }
 
     val uiState: StateFlow<CasaUiState> = combine(
         coreState,
         moneyAccountDraft,
         errorMessage,
-        temporalState
-    ) { core, accountDraft, error, temporal ->
+        temporalState,
+        housePlanRepository.observePendingFixedExpenses()
+    ) { core, accountDraft, error, temporal, pendings ->
         val planningReady =
             core.categories.any { !it.isArchived } && core.moneyAccounts.any { !it.isArchived }
 
@@ -142,6 +143,7 @@ class CasaViewModel @Inject constructor(
             currentPlan = temporal.currentPlan,
             previousPlan = temporal.previousPlan,
             currentPlanDetails = temporal.currentPlanDetails,
+            pendingFixedExpenses = pendings,
             selectedTab = core.selectedTab,
             categoryDraft = core.categoryDraft,
             moneyAccountDraft = accountDraft,
@@ -179,7 +181,8 @@ class CasaViewModel @Inject constructor(
             id = category.id,
             name = category.name,
             type = category.type,
-            targetText = category.targetCents?.let(::formatCentsForInput).orEmpty()
+            targetText = category.targetCents?.let(::formatCentsForInput).orEmpty(),
+            isFixedExpense = category.behavior == HouseCategoryBehavior.FIXED_EXPENSE
         )
     }
 
@@ -195,6 +198,10 @@ class CasaViewModel @Inject constructor(
         categoryDraft.value = categoryDraft.value?.copy(targetText = target)
     }
 
+    fun updateCategoryDraftFixedExpense(isFixedExpense: Boolean) {
+        categoryDraft.value = categoryDraft.value?.copy(isFixedExpense = isFixedExpense)
+    }
+
     fun dismissCategoryDialog() {
         categoryDraft.value = null
         errorMessage.value = null
@@ -207,10 +214,24 @@ class CasaViewModel @Inject constructor(
                 val targetCents = if (draft.type == HouseCategoryType.TARGET) {
                     parseEuroToCents(draft.targetText)
                 } else null
+                val behavior = if (draft.isFixedExpense) {
+                    HouseCategoryBehavior.FIXED_EXPENSE
+                } else HouseCategoryBehavior.BUDGET
                 if (draft.id == null) {
-                    categoryRepository.createCategory(draft.name, draft.type, targetCents)
+                    categoryRepository.createCategory(
+                        name = draft.name,
+                        type = draft.type,
+                        targetCents = targetCents,
+                        behavior = behavior
+                    )
                 } else {
-                    categoryRepository.updateCategory(draft.id, draft.name, draft.type, targetCents)
+                    categoryRepository.updateCategory(
+                        id = draft.id,
+                        name = draft.name,
+                        type = draft.type,
+                        targetCents = targetCents,
+                        behavior = behavior
+                    )
                 }
             }.onSuccess {
                 categoryDraft.value = null
@@ -227,6 +248,22 @@ class CasaViewModel @Inject constructor(
 
     fun reactivateCategory(id: Long) {
         viewModelScope.launch { categoryRepository.setCategoryArchived(id, false) }
+    }
+
+    fun setFixedExpensePaid(categoryId: Long, isPaid: Boolean) {
+        val monthId = uiState.value.currentPlanDetails?.id ?: return
+        viewModelScope.launch {
+            runCatching {
+                housePlanRepository.setFixedExpensePaid(monthId, categoryId, isPaid)
+            }.onFailure { errorMessage.value = it.message ?: "Errore durante l'aggiornamento" }
+        }
+    }
+
+    fun markPendingFixedExpensePaid(pendingId: Long) {
+        viewModelScope.launch {
+            runCatching { housePlanRepository.markPendingFixedExpensePaid(pendingId) }
+                .onFailure { errorMessage.value = it.message ?: "Errore durante l'aggiornamento" }
+        }
     }
 
     fun openNewMoneyAccount() { moneyAccountDraft.value = MoneyAccountDraft() }
