@@ -10,7 +10,8 @@ data class HouseMonthClosingDraft(
     val confirmedAvailableCents: Long,
     val availableAdjustmentNote: String? = null,
     val availableTransfers: List<HouseAvailableClosingTransferDraft> = emptyList(),
-    val categories: List<HouseCategoryClosingDraft>
+    val categories: List<HouseCategoryClosingDraft>,
+    val confirmUnreconciledFixedExpenseDeficit: Boolean = false
 )
 
 data class HouseAvailableClosingTransferDraft(
@@ -22,7 +23,10 @@ data class HouseCategoryClosingDraft(
     val categoryId: Long,
     val confirmedBalanceCents: Long,
     val adjustmentNote: String? = null,
-    val transfers: List<HouseClosingTransferDraft>
+    val transfers: List<HouseClosingTransferDraft> = emptyList(),
+    val categoryBehavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
+    val fixedExpenseClosingAction: FixedExpenseClosingAction? = null,
+    val fixedExpensePendingNote: String? = null
 )
 
 data class HouseClosingTransferDraft(
