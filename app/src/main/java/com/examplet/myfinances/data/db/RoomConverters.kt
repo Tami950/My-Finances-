@@ -2,6 +2,7 @@ package com.examplet.myfinances.data.db
 
 import androidx.room.TypeConverter
 import com.examplet.myfinances.domain.model.HouseCategoryType
+import com.examplet.myfinances.domain.model.HouseClosingDestinationType
 import com.examplet.myfinances.domain.model.HouseMonthStatus
 import com.examplet.myfinances.domain.model.MoneyAccountType
 
@@ -23,4 +24,11 @@ class RoomConverters {
 
     @TypeConverter
     fun toHouseMonthStatus(value: String): HouseMonthStatus = HouseMonthStatus.valueOf(value)
+
+    @TypeConverter
+    fun fromHouseClosingDestinationType(value: HouseClosingDestinationType): String = value.name
+
+    @TypeConverter
+    fun toHouseClosingDestinationType(value: String): HouseClosingDestinationType =
+        HouseClosingDestinationType.valueOf(value)
 }
