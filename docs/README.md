@@ -2,29 +2,28 @@
 
 Questa cartella contiene la documentazione viva del progetto. Le specifiche vengono aggiornate quando cambia una decisione funzionale, di dominio o architetturale.
 
-Da questa versione i file Markdown sono la sorgente canonica dei documenti principali. Le versioni PDF vengono rigenerate da queste sorgenti quando serve una copia da leggere/condividere.
+I file Markdown sono la sorgente canonica dei documenti principali. Le versioni PDF vengono rigenerate quando serve una copia da leggere/condividere.
 
 ## Documenti correnti
 
-- [Specifiche generali - v4](./MyFinances_Specifiche_Progetto_v4.md) - Obiettivi, sezioni, regole di dominio, Casa/Pianificazione, Dashboard, architettura e roadmap.
-- [Schema Room Casa - v2](./MyFinances_Schema_Room_Casa_v2.md) - Tabelle correnti, invarianti e prossime estensioni necessarie a stato mese, chiusura, movimenti e storico.
-- [Flussi UX, stati ed edge case - v1](./MyFinances_Flussi_UX_Edge_Case_v1.md) - Responsabilita' delle schermate, flussi operativi, casi limite e piano ordinato per chiudere Pianificazione v1.
+- [Specifiche generali - v4](./MyFinances_Specifiche_Progetto_v4.md) - Obiettivi, sezioni, regole di dominio, Casa/Pianificazione, Dashboard, Analisi futura, architettura e roadmap.
+- [Schema Room Casa - v2](./MyFinances_Schema_Room_Casa_v2.md) - Tabelle correnti, modello di chiusura, invarianti, movimenti e requisiti di preservazione storica.
+- [Flussi UX, stati ed edge case - v1](./MyFinances_Flussi_UX_Edge_Case_v1.md) - Responsabilita' delle schermate, flussi operativi, chiusura mese, casi limite e piano per completare Casa.
 
 ## Decisioni aggiunte nell'ultimo aggiornamento
 
-- Casa atterra sempre su Pianificazione quando viene selezionata dalla bottom navigation.
-- `house_months` ha stato `OPEN/CLOSED` e `closedAt`.
-- Un mese successivo non viene pianificato se il precedente esiste ed e' ancora aperto.
-- L'opening balance del nuovo mese deriva dal residuo finale del precedente chiuso, con fallback a zero e possibilita' di correzione manuale.
-- Allocazioni e posizioni non possono superare le risorse del mese.
-- Le posizioni rappresentano dove si trova il denaro adesso; i movimenti saranno modellati separatamente.
-- Pianificazione e' la schermata operativa Casa con card categoria, posizioni e flussi di modifica separati.
-- Il flag persistente `isHouseSetupCompleted` indica solo che l'onboarding iniziale e' stato completato. La possibilita' di creare una pianificazione richiede comunque almeno una categoria attiva e una posizione attiva; se vengono tutte archiviate il setup non viene dimenticato, ma il planner viene bloccato finche' la configurazione non torna valida.
-- Il residuo delle nuove risorse Casa non assegnate viene chiamato `Disponibile`, non `Da allocare`: puo' restare volutamente non allocato ed e' liquidita' Casa ancora libera.
-- Le future spese Casa potranno essere registrate anche senza categoria, scalando direttamente il `Disponibile`; questo richiede un modello di movimento/spesa che distingua spese categorizzate e spese sul disponibile.
-- Una categoria puo' essere nascosta da uno specifico mese senza archiviarla/eliminarla globalmente.
-- Delete futura con denaro residuo richiede prima riallocazione e deve preservare lo storico.
-- `Disponibile da spendere` in Dashboard resta invece un KPI personale: non va confuso con il `Disponibile` della pianificazione Casa.
+- `Disponibile` e' liquidita' Casa non vincolata, non denaro che deve necessariamente essere allocato.
+- La chiusura distingue sempre saldo calcolato e saldo finale confermato dall'utente.
+- Il saldo confermato resta sempre correggibile manualmente anche dopo l'introduzione dei movimenti.
+- Le discrepanze non vengono nascoste: si conserva una rettifica di chiusura e, opzionalmente, una nota.
+- Ogni residuo confermato deve essere distribuito completamente tra stessa categoria, altre categorie e/o Disponibile del mese successivo.
+- Gli split sono consentiti, ma la somma delle destinazioni deve essere esattamente uguale al residuo.
+- I Fondi Casa separati sono esclusi per ora: non e' stata identificata una semantica sufficientemente diversa da una normale categoria.
+- Gli opening del mese successivo derivano dalle distribuzioni della chiusura precedente e restano modificabili.
+- Dopo chiusura + autocompletamento si implementano navigazione mesi, movimenti categorie/Disponibile, movimenti posizioni e infine le rifiniture Personalizzazione.
+- `Analisi & Suggerimenti` e' ora un requisito mandatorio futuro, non una feature opzionale.
+- Prima di considerare definitivamente chiusa Casa, verra' eseguito un audit dello schema e di tutti i flussi per verificare che vengano conservati i dati grezzi necessari a indicatori e suggerimenti futuri.
+- Principio per l'analisi: dato grezzo -> indicatore derivato -> suggerimento. Allocazioni, movimenti, rettifiche e distribuzioni non devono essere sovrascritti o persi se possono avere valore storico.
 
 ## Regola di manutenzione
 
@@ -40,4 +39,4 @@ La documentazione deve descrivere lo stato deciso del progetto, non soltanto il 
 
 ## Versioni precedenti
 
-Le vecchie versioni restano recuperabili dalla cronologia Git. I precedenti PDF v3/"Definitivo" sono stati rimossi dal branch corrente per evitare che documentazione superata sembri ancora valida.
+Le vecchie versioni restano recuperabili dalla cronologia Git.
