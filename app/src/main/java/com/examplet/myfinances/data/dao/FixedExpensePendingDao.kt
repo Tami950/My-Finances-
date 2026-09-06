@@ -43,6 +43,12 @@ interface FixedExpensePendingDao {
     )
     fun observePending(): Flow<List<FixedExpensePendingRow>>
 
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM house_fixed_expense_pendings WHERE status = 'PENDING'")
+    fun observePendingTotalCents(): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM house_fixed_expense_pendings WHERE status = 'PENDING'")
+    suspend fun getPendingTotalCents(): Long
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(entity: FixedExpensePendingEntity): Long
 
