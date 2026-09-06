@@ -112,6 +112,21 @@ Il pendente NON diventa:
 
 E' un obbligo gia' finanziato nel mese di origine.
 
+Il denaro del pendente, finche' non viene pagato, esiste ancora fisicamente. Per questo motivo concorre ai `Fondi Casa complessivi`, ma non al `Disponibile`.
+
+Formula operativa del mese corrente:
+
+```text
+Fondi Casa complessivi
+=
+nuove risorse
++ Disponibile ereditato
++ opening categorie
++ spese fisse pendenti ancora finanziate
+```
+
+Questo evita falsi errori nelle posizioni fisiche: il denaro puo' essere ancora presente su conto/contanti pur essendo gia' vincolato a una spesa pendente.
+
 Nel mese successivo viene mostrato in una sezione separata:
 
 ```text
@@ -122,7 +137,10 @@ Ereditato da Agosto 2026
 Nota: pagamento previsto il 2 settembre
 ```
 
-Quando viene segnato pagato cambia soltanto lo stato del pendente: non viene effettuata una nuova sottrazione dal budget corrente.
+Quando viene segnato pagato:
+- cambia lo stato del pendente;
+- non viene effettuata una nuova sottrazione dal budget corrente;
+- l'importo smette di concorrere ai Fondi Casa complessivi, perche' il denaro e' uscito fisicamente.
 
 ## 8. Distinzione da opening e categorie normali
 `BUDGET`:
