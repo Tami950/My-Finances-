@@ -175,6 +175,12 @@ fun CreateHousePlanScreen(
                             state.openingBalanceCents
                         )
                     }
+                    if (state.pendingFixedExpensesCents > 0) {
+                        SummaryRow(
+                            stringResource(R.string.house_summary_pending_fixed),
+                            state.pendingFixedExpensesCents
+                        )
+                    }
                     SummaryRow(
                         stringResource(R.string.house_summary_total_funds),
                         state.totalHouseFundsCents
