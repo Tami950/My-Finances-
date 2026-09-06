@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -97,8 +98,8 @@ fun CloseHouseMonthScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                        ClosingValueRow(stringResource(R.string.house_closing_to_categories), state.availableDistributedToCategoriesCents ?: 0)
                         ClosingValueRow(stringResource(R.string.house_closing_keep_available), state.availableKeptCents ?: 0)
+                        ClosingValueRow(stringResource(R.string.house_closing_to_categories), state.availableDistributedToCategoriesCents ?: 0)
                         state.availableOverDistributedCents?.takeIf { it > 0 }?.let { overflow ->
                             Text(
                                 stringResource(R.string.house_closing_over_distributed, formatHouseCents(overflow)),
@@ -117,10 +118,7 @@ fun CloseHouseMonthScreen(
                             )
                         }
                         Text(stringResource(R.string.house_closing_available_rollover_help), style = MaterialTheme.typography.bodySmall)
-                        OutlinedButton(
-                            onClick = viewModel::openAvailableDistribution,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                        OutlinedButton(onClick = viewModel::openAvailableDistribution, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.house_closing_manage_available))
                         }
                     }
@@ -154,7 +152,6 @@ fun CloseHouseMonthScreen(
                                 }
                                 BudgetDistributionStatus(row)
                             }
-
                             HouseCategoryBehavior.FIXED_EXPENSE -> {
                                 ClosingValueRow(stringResource(R.string.house_fixed_expense_planned), row.calculatedBalanceCents)
                                 row.fixedExpenseSurplusCents?.takeIf { it > 0 }?.let {
@@ -172,8 +169,18 @@ fun CloseHouseMonthScreen(
                                 }
                             }
                         }
-                        row.adjustmentCents?.takeIf { it != 0L }?.let { adjustment -> ClosingAdjustment(adjustment) }
+                        row.adjustmentCents?.takeIf { it != 0L }?.let { adjustment ->
+                            ClosingAdjustment(adjustment)
+                        }
+                    }
+                }
 
+                if (!state.fixedDestinationCapacityIsValid) {
+                    item(key = "fixed-destination-error") {
+                        Text(
+                            stringResource(R.string.house_closing_fixed_destination_global_error),
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
 
@@ -199,22 +206,25 @@ fun CloseHouseMonthScreen(
             onDismissRequest = viewModel::dismissAvailableDistribution,
             title = { Text(stringResource(R.string.house_summary_unallocated), style = MaterialTheme.typography.titleLarge) },
             actions = {
-                Button(onClick = viewModel::dismissAvailableDistribution) { Text(stringResource(R.string.action_done)) }
+                Button(
+                    onClick = viewModel::commitAvailableDistribution,
+                    enabled = state.availableSheetIsValid
+                ) { Text(stringResource(R.string.action_done)) }
             }
         ) {
-            Text(stringResource(R.string.house_closing_available_destinations_help), style = MaterialTheme.typography.bodySmall)
             ClosingValueRow(stringResource(R.string.house_closing_confirmed_balance), state.confirmedAvailableCents ?: 0)
+            ClosingValueRow(stringResource(R.string.house_closing_keep_available), state.availableKeptCents ?: 0)
+            Text(stringResource(R.string.house_closing_available_destinations_help), style = MaterialTheme.typography.bodySmall)
+            HorizontalDivider()
             state.availableDestinations.forEach { destination ->
-                OutlinedTextField(
-                    value = destination.amountText,
-                    onValueChange = { viewModel.updateAvailableDestinationAmount(destination.categoryId, it) },
-                    label = { Text(destination.label) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                DestinationAmountField(
+                    label = destination.label,
+                    amountText = destination.amountText,
+                    fixedLimitCents = destination.fixedExpenseDefaultCents,
+                    fixedOverflowCents = state.fixedDestinationOverflow(destination.categoryId),
+                    onValueChange = { viewModel.updateAvailableDestinationAmount(destination.categoryId, it) }
                 )
             }
-            ClosingValueRow(stringResource(R.string.house_closing_keep_available), state.availableKeptCents ?: 0)
             state.availableOverDistributedCents?.takeIf { it > 0 }?.let { overflow ->
                 Text(
                     stringResource(R.string.house_closing_over_distributed, formatHouseCents(overflow)),
@@ -230,12 +240,15 @@ fun CloseHouseMonthScreen(
             onDismissRequest = viewModel::dismissCategory,
             title = { Text(row.categoryName, style = MaterialTheme.typography.titleLarge) },
             actions = {
-                Button(onClick = viewModel::dismissCategory) { Text(stringResource(R.string.action_done)) }
+                Button(
+                    onClick = viewModel::commitCategory,
+                    enabled = state.categorySheetIsValid(row.categoryId)
+                ) { Text(stringResource(R.string.action_done)) }
             }
         ) {
             when (row.categoryBehavior) {
-                HouseCategoryBehavior.BUDGET -> BudgetClosingEditor(row, viewModel)
-                HouseCategoryBehavior.FIXED_EXPENSE -> FixedExpenseClosingEditor(row, viewModel)
+                HouseCategoryBehavior.BUDGET -> BudgetClosingEditor(row, state, viewModel)
+                HouseCategoryBehavior.FIXED_EXPENSE -> FixedExpenseClosingEditor(row, state, viewModel)
             }
         }
     }
@@ -260,8 +273,9 @@ fun CloseHouseMonthScreen(
                 )
                 Text(stringResource(R.string.house_fixed_expense_uncovered_confirm))
             }
-            state.availableAdjustmentCents?.takeIf { it != 0L }?.let { adjustment -> ClosingAdjustment(adjustment) }
-
+            state.availableAdjustmentCents?.takeIf { it != 0L }?.let { adjustment ->
+                ClosingAdjustment(adjustment)
+            }
             val categoryAdjustments = state.categories.count { (it.adjustmentCents ?: 0) != 0L }
             if (categoryAdjustments > 0) {
                 Text(stringResource(R.string.house_closing_adjusted_categories_count, categoryAdjustments))
@@ -271,7 +285,11 @@ fun CloseHouseMonthScreen(
 }
 
 @Composable
-private fun BudgetClosingEditor(row: HouseCategoryClosingUi, viewModel: CloseHouseMonthViewModel) {
+private fun BudgetClosingEditor(
+    row: HouseCategoryClosingUi,
+    state: CloseHouseMonthUiState,
+    viewModel: CloseHouseMonthViewModel
+) {
     ClosingValueRow(stringResource(R.string.house_closing_calculated_balance), row.calculatedBalanceCents)
     OutlinedTextField(
         value = row.confirmedBalanceText,
@@ -281,43 +299,42 @@ private fun BudgetClosingEditor(row: HouseCategoryClosingUi, viewModel: CloseHou
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
-    row.adjustmentCents?.takeIf { it != 0L }?.let {
-        ClosingAdjustment(it)
+    if (row.canKeepInSource) {
+        ClosingValueRow(stringResource(R.string.house_closing_keep_in_category, row.categoryName), row.keepInSourceCents ?: 0)
+    }
+    row.adjustmentCents?.takeIf { it != 0L }?.let { adjustment ->
+        ClosingAdjustment(adjustment)
         OutlinedTextField(
             value = row.adjustmentNote,
-            onValueChange = { value -> viewModel.updateCategoryAdjustmentNote(row.categoryId, value) },
+            onValueChange = { viewModel.updateCategoryAdjustmentNote(row.categoryId, it) },
             label = { Text(stringResource(R.string.house_closing_adjustment_note)) },
             modifier = Modifier.fillMaxWidth()
         )
     }
     Text(stringResource(R.string.house_closing_destinations_title), style = MaterialTheme.typography.titleMedium)
     Text(stringResource(R.string.house_closing_default_keep_help), style = MaterialTheme.typography.bodySmall)
-    if (row.canKeepInSource) {
-        ClosingValueRow(stringResource(R.string.house_closing_keep_in_category, row.categoryName), row.keepInSourceCents ?: 0)
-    }
     row.destinations.forEach { destination ->
-        OutlinedTextField(
-            value = destination.amountText,
+        DestinationAmountField(
+            label = if (destination.type == HouseClosingDestinationType.AVAILABLE) {
+                stringResource(R.string.house_summary_unallocated)
+            } else destination.label,
+            amountText = destination.amountText,
+            fixedLimitCents = destination.fixedExpenseDefaultCents,
+            fixedOverflowCents = state.fixedDestinationOverflow(destination.categoryId),
             onValueChange = {
                 viewModel.updateDestinationAmount(row.categoryId, destination.type, destination.categoryId, it)
-            },
-            label = {
-                Text(
-                    if (destination.type == HouseClosingDestinationType.AVAILABLE) {
-                        stringResource(R.string.house_summary_unallocated)
-                    } else destination.label
-                )
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            }
         )
     }
     BudgetDistributionStatus(row)
 }
 
 @Composable
-private fun FixedExpenseClosingEditor(row: HouseCategoryClosingUi, viewModel: CloseHouseMonthViewModel) {
+private fun FixedExpenseClosingEditor(
+    row: HouseCategoryClosingUi,
+    state: CloseHouseMonthUiState,
+    viewModel: CloseHouseMonthViewModel
+) {
     ClosingValueRow(stringResource(R.string.house_fixed_expense_planned), row.calculatedBalanceCents)
     OutlinedTextField(
         value = row.confirmedBalanceText,
@@ -327,11 +344,11 @@ private fun FixedExpenseClosingEditor(row: HouseCategoryClosingUi, viewModel: Cl
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
-    row.adjustmentCents?.takeIf { it != 0L }?.let {
-        ClosingAdjustment(it)
+    row.adjustmentCents?.takeIf { it != 0L }?.let { adjustment ->
+        ClosingAdjustment(adjustment)
         OutlinedTextField(
             value = row.adjustmentNote,
-            onValueChange = { value -> viewModel.updateCategoryAdjustmentNote(row.categoryId, value) },
+            onValueChange = { viewModel.updateCategoryAdjustmentNote(row.categoryId, it) },
             label = { Text(stringResource(R.string.house_closing_adjustment_note)) },
             modifier = Modifier.fillMaxWidth()
         )
@@ -362,20 +379,19 @@ private fun FixedExpenseClosingEditor(row: HouseCategoryClosingUi, viewModel: Cl
 
     row.fixedExpenseSurplusCents?.takeIf { it > 0 }?.let { surplus ->
         ClosingValueRow(stringResource(R.string.house_fixed_expense_surplus), surplus)
+        ClosingValueRow(stringResource(R.string.house_fixed_expense_keep_available), row.fixedExpenseKeepAvailableCents ?: 0)
         Text(stringResource(R.string.house_fixed_expense_surplus_help), style = MaterialTheme.typography.bodySmall)
         row.destinations.forEach { destination ->
-            OutlinedTextField(
-                value = destination.amountText,
+            DestinationAmountField(
+                label = destination.label,
+                amountText = destination.amountText,
+                fixedLimitCents = destination.fixedExpenseDefaultCents,
+                fixedOverflowCents = state.fixedDestinationOverflow(destination.categoryId),
                 onValueChange = {
                     viewModel.updateDestinationAmount(row.categoryId, destination.type, destination.categoryId, it)
-                },
-                label = { Text(destination.label) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                }
             )
         }
-        ClosingValueRow(stringResource(R.string.house_fixed_expense_keep_available), row.fixedExpenseKeepAvailableCents ?: 0)
         row.fixedExpenseOverDistributedCents?.takeIf { it > 0 }?.let { overflow ->
             Text(
                 stringResource(R.string.house_closing_over_distributed, formatHouseCents(overflow)),
@@ -387,6 +403,41 @@ private fun FixedExpenseClosingEditor(row: HouseCategoryClosingUi, viewModel: Cl
     row.fixedExpenseDeficitCents?.takeIf { it > 0 }?.let { deficit ->
         ClosingValueRow(stringResource(R.string.house_fixed_expense_deficit), deficit)
         Text(stringResource(R.string.house_fixed_expense_deficit_help), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun DestinationAmountField(
+    label: String,
+    amountText: String,
+    fixedLimitCents: Long?,
+    fixedOverflowCents: Long,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = amountText,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        supportingText = fixedLimitCents?.let { limit ->
+            {
+                Text(
+                    stringResource(
+                        R.string.house_closing_fixed_destination_limit,
+                        formatHouseCents(limit)
+                    )
+                )
+            }
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+    if (fixedOverflowCents > 0) {
+        Text(
+            stringResource(R.string.house_closing_fixed_destination_overflow, formatHouseCents(fixedOverflowCents)),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 
