@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.examplet.myfinances.data.entity.HouseMonthAvailableClosingTransferEntity
 import com.examplet.myfinances.data.entity.HouseMonthCategoryClosingEntity
 import com.examplet.myfinances.data.entity.HouseMonthClosingEntity
 import com.examplet.myfinances.data.entity.HouseMonthClosingTransferEntity
@@ -19,6 +20,9 @@ interface HouseMonthClosingDao {
     @Query("SELECT * FROM house_month_closing_transfers WHERE houseMonthId = :houseMonthId ORDER BY id ASC")
     suspend fun getTransfers(houseMonthId: Long): List<HouseMonthClosingTransferEntity>
 
+    @Query("SELECT * FROM house_month_available_closing_transfers WHERE houseMonthId = :houseMonthId ORDER BY id ASC")
+    suspend fun getAvailableTransfers(houseMonthId: Long): List<HouseMonthAvailableClosingTransferEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertMonthClosing(closing: HouseMonthClosingEntity): Long
 
@@ -27,4 +31,7 @@ interface HouseMonthClosingDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTransfers(transfers: List<HouseMonthClosingTransferEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAvailableTransfers(transfers: List<HouseMonthAvailableClosingTransferEntity>)
 }
