@@ -8,6 +8,7 @@ import com.examplet.myfinances.data.dao.HouseMonthClosingDao
 import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.dao.MoneyAccountDao
+import com.examplet.myfinances.data.db.MIGRATION_5_6
 import com.examplet.myfinances.data.db.MyFinancesDatabase
 import dagger.Module
 import dagger.Provides
@@ -29,8 +30,9 @@ object DatabaseModule {
         MyFinancesDatabase::class.java,
         "my_finances.db"
     )
-        // Temporary during early development: there is no user data to preserve yet.
-        // Replace with explicit migrations before the database contains real data.
+        // Preserve the current development data while introducing month closing.
+        .addMigrations(MIGRATION_5_6)
+        // Still temporary for older unsupported development schemas.
         .fallbackToDestructiveMigration()
         .build()
 
