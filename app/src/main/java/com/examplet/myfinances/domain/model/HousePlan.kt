@@ -5,15 +5,20 @@ data class HousePlanSummary(
     val year: Int,
     val month: Int,
     val totalResourcesCents: Long,
+    val openingAvailableCents: Long,
+    val openingBalanceCents: Long,
     val allocatedCents: Long,
     val positionedCents: Long,
     val status: HouseMonthStatus
 ) {
-    val unallocatedCents: Long
-        get() = totalResourcesCents - allocatedCents
+    val availableCents: Long
+        get() = openingAvailableCents + totalResourcesCents - allocatedCents
+
+    val totalHouseFundsCents: Long
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
 
     val unpositionedCents: Long
-        get() = totalResourcesCents - positionedCents
+        get() = totalHouseFundsCents - positionedCents
 }
 
 data class HousePlanDetails(
@@ -21,6 +26,7 @@ data class HousePlanDetails(
     val year: Int,
     val month: Int,
     val totalResourcesCents: Long,
+    val openingAvailableCents: Long,
     val note: String?,
     val status: HouseMonthStatus,
     val closedAt: Long?,
@@ -36,11 +42,14 @@ data class HousePlanDetails(
     val positionedCents: Long
         get() = accountBalances.sumOf { it.amountCents }
 
-    val unallocatedCents: Long
-        get() = totalResourcesCents - allocatedCents
+    val availableCents: Long
+        get() = openingAvailableCents + totalResourcesCents - allocatedCents
+
+    val totalHouseFundsCents: Long
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
 
     val unpositionedCents: Long
-        get() = totalResourcesCents - positionedCents
+        get() = totalHouseFundsCents - positionedCents
 }
 
 data class HousePlanAllocation(
@@ -68,6 +77,7 @@ data class HousePlanDraft(
     val year: Int,
     val month: Int,
     val totalResourcesCents: Long,
+    val openingAvailableCents: Long = 0,
     val note: String? = null,
     val allocations: List<HousePlanAllocationDraft>,
     val accountBalances: List<HousePlanAccountBalanceDraft>
