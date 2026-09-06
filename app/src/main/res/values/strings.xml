@@ -45,6 +45,7 @@
     <string name="house_summary_allocated">Allocato</string>
     <string name="house_summary_unallocated">Disponibile</string>
     <string name="house_summary_opening">Residui iniziali categorie</string>
+    <string name="house_summary_pending_fixed">Spese fisse pendenti già finanziate</string>
     <string name="house_summary_total_funds">Fondi Casa complessivi</string>
     <string name="house_summary_positioned">Posizionato</string>
     <string name="house_summary_unpositioned">Da posizionare</string>
