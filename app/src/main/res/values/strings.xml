@@ -14,6 +14,8 @@
     <string name="house_setup_action">Configura Casa</string>
     <string name="house_setup_complete">Completa configurazione</string>
     <string name="house_setup_requirement">Per completare il setup servono almeno una categoria e un money account attivi.</string>
+    <string name="house_planning_not_ready_title">Completa la configurazione di Casa</string>
+    <string name="house_planning_not_ready_description">Prima di creare una nuova pianificazione servono almeno una categoria attiva e una posizione del denaro attiva.</string>
 
     <string name="house_planning_empty_title">Nessuna pianificazione per %1$s</string>
     <string name="house_planning_empty_description">Puoi creare la pianificazione del mese usando le categorie e le posizioni configurate per Casa.</string>
