@@ -25,9 +25,7 @@ fun CasaScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.resetToPlanning()
-    }
+    LaunchedEffect(Unit) { viewModel.resetToPlanning() }
 
     AppScreen {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -58,6 +56,7 @@ fun CasaScreen(
 
                 CasaTab.CUSTOMIZATION -> HouseCustomizationContent(
                     state = state,
+                    onEditUsualResources = viewModel::openUsualResources,
                     onAddCategory = viewModel::openNewCategory,
                     onEditCategory = viewModel::openCategory,
                     onArchiveCategory = viewModel::archiveCategory,
@@ -72,14 +71,30 @@ fun CasaScreen(
         }
     }
 
+    state.usualResourcesDraftText?.let { value ->
+        HouseUsualResourcesSheet(
+            value = value,
+            errorMessage = state.errorMessage,
+            onValueChange = viewModel::updateUsualResourcesDraft,
+            onSave = viewModel::saveUsualResources,
+            onDismiss = viewModel::dismissUsualResources
+        )
+    }
+
     state.categoryDraft?.let { draft ->
         HouseCategorySheet(
             draft = draft,
+            categories = state.categories,
+            currentPlanDetails = state.currentPlanDetails,
             errorMessage = state.errorMessage,
             onNameChange = viewModel::updateCategoryDraftName,
             onTypeChange = viewModel::updateCategoryDraftType,
             onTargetChange = viewModel::updateCategoryDraftTarget,
             onFixedExpenseChange = viewModel::updateCategoryDraftFixedExpense,
+            onFixedExpenseDefaultChange = viewModel::updateCategoryDraftFixedExpenseDefault,
+            onApplyToCurrentMonthChange = viewModel::updateCategoryApplyToCurrentMonth,
+            onUseAvailableChange = viewModel::updateCategoryUseAvailableForReallocation,
+            onReallocationCategoryChange = viewModel::updateCategoryReallocationCategory,
             onSave = viewModel::saveCategory,
             onDismiss = viewModel::dismissCategoryDialog
         )
