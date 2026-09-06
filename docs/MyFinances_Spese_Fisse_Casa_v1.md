@@ -1,18 +1,14 @@
 # MyFinances - Spese fisse Casa v1
 
 Data: 6 settembre 2026
-Stato: requisito funzionale e modello implementato per il primo test sulla chiusura mese
+Stato: requisito funzionale corrente per Pianificazione e Chiusura Casa
 
 ## 1. Obiettivo
 Una spesa fissa e' una categoria Casa che partecipa alla pianificazione ma non rappresenta un budget da consumare tramite movimenti ordinari.
 
-Esempi:
-- Affitto;
-- Mamma;
-- Zia;
-- altre uscite pianificate come importo unico del mese.
+Esempi: Affitto, Mamma, Zia e altre uscite pianificate come importo unico del mese.
 
-La spesa fissa e' distinta dalla sezione Bollette. Bollette gestisce scadenze, ricorrenze e promemoria; una spesa fissa descrive invece il comportamento dell'importo nella Pianificazione Casa.
+La spesa fissa e' distinta da Bollette: Bollette gestisce scadenze, ricorrenze e promemoria; FIXED_EXPENSE descrive il comportamento del denaro nella Pianificazione Casa.
 
 ## 2. Comportamento categoria
 Il dominio usa:
@@ -24,169 +20,226 @@ Nella UI l'utente vede una semplice checkbox `Spesa fissa`.
 Default:
 - categorie esistenti migrate -> `BUDGET`;
 - nuove categorie -> `BUDGET`;
-- l'utente abilita esplicitamente la checkbox per trasformarle in spese fisse.
+- l'utente abilita esplicitamente la checkbox.
 
-Il comportamento viene copiato nello stato mensile delle allocazioni OPEN. Questo evita che la sola definizione globale debba reinterpretare uno storico gia' chiuso.
+Una FIXED_EXPENSE non usa `FLEXIBLE/TARGET`: possiede invece un `fixedExpenseDefaultCents`, cioe' l'importo mensile abituale.
 
-## 3. Pianificazione mensile
-Una spesa fissa continua a usare l'importo allocato nella pianificazione e riduce il Disponibile esattamente come le altre allocazioni.
+## 3. Importo abituale e importo del singolo mese
+In Personalizzazione una spesa fissa richiede un importo abituale maggiore di zero.
 
 Esempio:
-- Risorse: 2.000 EUR;
-- Affitto: 700 EUR FIXED_EXPENSE;
-- Gatto: 50 EUR BUDGET;
-- Disponibile: 1.250 EUR.
+```text
+Affitto
+Spesa fissa
+Importo abituale: 700 EUR
+```
 
-I 700 EUR di Affitto non diventano disponibili solo perche' la spesa non e' ancora stata materialmente pagata: sono denaro vincolato.
+Quando si crea un nuovo mese, 700 EUR viene proposto automaticamente ma resta modificabile per quel mese.
 
-## 4. Stato di pagamento
-Per la prima versione lo stato mensile e':
-- `PLANNED`: pianificata / ancora da pagare;
+Se durante la pianificazione l'utente cambia l'importo puo' attivare:
+`Usa questo importo come nuovo valore abituale`.
+
+Il flag e' sempre opt-in. Al salvataggio del piano, se e' attivo, l'app richiede una conferma prima di aggiornare il valore globale usato nei mesi futuri.
+
+## 4. Prefinanziamento
+Una spesa fissa non riceve un normale opening di categoria.
+
+Il modello mensile distingue:
+```text
+fixedExpensePlannedCents   = importo previsto complessivo del mese
+fixedExpensePrefundedCents = denaro gia' coperto da mesi precedenti
+allocatedCents             = nuove risorse necessarie nel mese
+```
+
+Invariante:
+```text
+0 <= prefunded <= planned
+allocated = planned - prefunded
+openingBalanceCents = 0 per FIXED_EXPENSE
+```
+
+Esempio:
+```text
+Affitto previsto        700 EUR
+Gia' prefinanziato      200 EUR
+Da nuove risorse        500 EUR
+```
+
+I 200 EUR sono denaro gia' vincolato, non un residuo spendibile della categoria.
+
+## 5. Destinazioni della chiusura
+Durante la chiusura, una categoria o il Disponibile possono destinare denaro a una FIXED_EXPENSE del mese successivo. Tale denaro diventa prefunding, non opening.
+
+Una spesa fissa non puo' essere prefinanziata oltre il proprio importo abituale previsto.
+
+Il limite e' globale al wizard: si sommano gli importi provenienti da tutte le categorie e dal Disponibile. Se il totale supera il limite:
+- viene mostrato un errore;
+- `Fatto` del foglio interessato resta disabilitato;
+- `Chiudi mese` resta disabilitato.
+
+## 6. Risorse Casa abituali
+Personalizzazione possiede anche `Nuove risorse Casa abituali`.
+
+Se valorizzato, il campo `Nuove risorse Casa del mese` viene precompilato automaticamente nei nuovi piani e resta modificabile per il singolo mese.
+
+Il Disponibile ereditato resta separato:
+```text
+nuove risorse abituali = default di nuove risorse del mese
+Disponibile ereditato  = deriva dalla chiusura precedente
+```
+
+Nel primo mese senza precedente, il Disponibile ereditato e' automaticamente 0.
+
+## 7. Modifica del default da Personalizzazione
+Quando si modifica l'importo abituale di una FIXED_EXPENSE esistente, l'utente sceglie:
+- `Dal prossimo mese`;
+- `Anche al mese corrente`.
+
+Cambiare solo il default globale non modifica silenziosamente un mese gia' OPEN.
+
+Se viene scelto `Anche al mese corrente`, la differenza deve essere riconciliata esplicitamente.
+
+### 7.1 Aumento
+Se il nuovo importo e' maggiore, l'utente sceglie la sorgente:
+- Disponibile, mostrando quanto e' disponibile;
+- una categoria `BUDGET` con fondi sufficienti.
+
+Non si usa un'altra FIXED_EXPENSE come sorgente ordinaria.
+
+### 7.2 Diminuzione
+Se il nuovo importo e' minore, l'importo liberato viene destinato a:
+- Disponibile, default;
+- una categoria `BUDGET`.
+
+Se il nuovo importo scende sotto il prefunding gia' presente, l'eccedenza prefinanziata viene liberata esplicitamente e non puo' restare nella FIXED_EXPENSE.
+
+### 7.3 Provenienza del denaro
+La riconciliazione preserva, per quanto possibile, la provenienza:
+- quota proveniente da nuova allocazione resta nuova allocazione;
+- quota proveniente da opening diventa prefunding;
+- quota liberata da prefunding verso una categoria BUDGET diventa opening;
+- quota liberata da nuova allocazione verso una categoria BUDGET resta allocazione.
+
+## 8. Conversione BUDGET -> FIXED_EXPENSE nel mese OPEN
+Se una categoria gia' presente nel mese viene convertita in spesa fissa e si applica la modifica anche al mese corrente:
+```text
+vecchio opening categoria -> fixedExpensePrefundedCents
+vecchia allocazione       -> allocatedCents
+somma                      -> fixedExpensePlannedCents iniziale
+openingBalanceCents        -> 0
+```
+
+Solo dopo questa conversione l'eventuale differenza con il nuovo importo abituale viene riconciliata.
+
+I mesi CLOSED non vengono reinterpretati.
+
+## 9. Stato di pagamento
+Per la prima versione:
+- `PLANNED`: prevista / ancora da pagare;
 - `PAID`: pagata.
 
-La card della spesa fissa permette di segnare Pagata / Da pagare.
+Cambiare stato non modifica la pianificazione: il denaro e' gia' considerato vincolato.
 
-Cambiare lo stato non modifica il budget: indica soltanto se l'obbligo e' stato materialmente eseguito.
-
-## 5. Chiusura mese
-Per una categoria BUDGET continua a valere il flusso residuo normale.
-
-Per una FIXED_EXPENSE il wizard mostra:
-- importo pianificato;
+## 10. Chiusura della spesa fissa
+Il wizard mostra:
+- importo previsto;
 - importo reale;
 - eventuale rettifica;
-- stato/risoluzione finale.
+- risoluzione finale.
 
-Se la spesa risulta non pagata, prima di chiudere occorre scegliere esplicitamente:
-- `MARK_PAID`: e' stata pagata ma lo stato non era stato aggiornato;
-- `KEEP_PENDING`: resta da pagare;
-- `CANCELLED`: non e' piu' dovuta.
+Se non risulta pagata occorre scegliere:
+- `MARK_PAID`;
+- `KEEP_PENDING`;
+- `CANCELLED`.
 
-`KEEP_PENDING` consente una nota opzionale da mostrare insieme al pendente nel mese successivo.
+`KEEP_PENDING` consente una nota opzionale per il mese successivo.
 
-## 6. Differenza pianificato / reale
-Definizioni:
-- planned = importo pianificato della spesa fissa nel mese;
-- actual = importo reale confermato in chiusura.
+### 10.1 Reale uguale al previsto
+Nessuna differenza monetaria.
 
-### 6.1 actual = planned
-Nessuna differenza monetaria da riconciliare.
+### 10.2 Reale minore del previsto
+```text
+surplus = planned - actual
+```
 
-### 6.2 actual < planned
-Si genera un importo liberato:
-- surplus = planned - actual.
+Il surplus non e' residuo della FIXED_EXPENSE. Va al Disponibile per default e puo' essere riallocato verso categorie valide.
 
-Il surplus non e' un residuo della categoria fissa.
-Per default va al Disponibile, ma l'utente puo' riallocarne una parte o tutto verso categorie attive.
-
-Il valore che resta al Disponibile si aggiorna automaticamente mentre l'utente inserisce altre destinazioni.
-
-### 6.3 actual > planned
-Si genera un extra:
-- deficit = actual - planned.
+### 10.3 Reale maggiore del previsto
+```text
+deficit = actual - planned
+```
 
 Il deficit viene assorbito automaticamente dal Disponibile.
 
 Se il Disponibile non basta:
-- Disponibile calcolato viene portato a zero;
-- la parte non coperta viene conservata come `unreconciledFixedExpenseDeficitCents`;
+- Disponibile calcolato -> 0;
+- la parte non coperta viene salvata come `unreconciledFixedExpenseDeficitCents`;
 - viene mostrato un warning;
-- la chiusura resta consentita dopo conferma esplicita;
-- il sistema non inventa una provenienza del denaro mancante.
+- la chiusura resta possibile con conferma;
+- l'app non inventa una provenienza del denaro mancante.
 
-Questo dato deve restare disponibile per controlli storici e futura Analisi & Suggerimenti.
+## 11. Spesa pendente
+`KEEP_PENDING` crea una riga separata con categoria, mese origine, importo reale, nota, stato e timestamp.
 
-## 7. Spesa pendente
-Se in chiusura viene scelto `KEEP_PENDING`, si crea una riga in `house_fixed_expense_pendings` con:
-- categoria;
-- mese di origine;
-- importo reale ancora dovuto;
-- nota opzionale;
-- stato PENDING;
-- timestamp.
+Il pendente NON diventa opening, nuova allocazione o Disponibile. E' un obbligo gia' finanziato.
 
-Il pendente NON diventa:
-- opening della categoria;
-- nuova allocazione;
-- nuovo Disponibile.
-
-E' un obbligo gia' finanziato nel mese di origine.
-
-Il denaro del pendente, finche' non viene pagato, esiste ancora fisicamente. Per questo motivo concorre ai `Fondi Casa complessivi`, ma non al `Disponibile`.
-
-Formula operativa del mese corrente:
+Finche' e' PENDING il denaro esiste ancora fisicamente e concorre ai Fondi Casa complessivi, ma non al Disponibile.
 
 ```text
 Fondi Casa complessivi
 =
 nuove risorse
 + Disponibile ereditato
-+ opening categorie
++ opening categorie BUDGET
++ prefunding spese fisse
 + spese fisse pendenti ancora finanziate
 ```
 
-Questo evita falsi errori nelle posizioni fisiche: il denaro puo' essere ancora presente su conto/contanti pur essendo gia' vincolato a una spesa pendente.
+Quando il pendente viene segnato pagato non viene sottratto di nuovo dal budget corrente; smette invece di concorrere ai fondi fisicamente presenti.
 
-Nel mese successivo viene mostrato in una sezione separata:
+## 12. Regola UX dei bottom sheet
+I bottom sheet dell'app:
+- non si chiudono toccando lo sfondo;
+- non si chiudono trascinandoli verso il basso;
+- mostrano una X in alto a destra;
+- si concludono con X oppure con un'azione esplicita.
 
-```text
-Spese fisse pendenti
+Semantica:
+- X = annulla le modifiche effettuate nel foglio;
+- `Fatto/Salva/Conferma` = valida e applica;
+- se il contenuto e' invalido, l'azione positiva rimane disabilitata quando applicabile.
 
-Affitto      700 EUR
-Ereditato da Agosto 2026
-Nota: pagamento previsto il 2 settembre
-```
+Nel foglio di distribuzione del Disponibile l'ordine e':
+1. saldo reale;
+2. `Mantieni Disponibile`, aggiornato live;
+3. destinazioni;
+4. eventuali errori.
 
-Quando viene segnato pagato:
-- cambia lo stato del pendente;
-- non viene effettuata una nuova sottrazione dal budget corrente;
-- l'importo smette di concorrere ai Fondi Casa complessivi, perche' il denaro e' uscito fisicamente.
+## 13. Persistenza Room
+Room v8 ha introdotto comportamento, stato di pagamento, chiusura fixed e pendenti.
 
-## 8. Distinzione da opening e categorie normali
-`BUDGET`:
-- possiede saldo;
-- in futuro possiede movimenti;
-- genera residuo;
-- residuo puo' essere mantenuto o spostato.
+Room v9 introduce:
+- `house_categories.fixedExpenseDefaultCents`;
+- `house_monthly_allocations.fixedExpensePlannedCents`;
+- `house_monthly_allocations.fixedExpensePrefundedCents`.
 
-`FIXED_EXPENSE`:
-- rappresenta un importo impegnato;
-- non richiede movimenti ordinari;
-- possiede stato di pagamento;
-- non genera un residuo trasferibile come concetto normale;
-- solo la differenza tra pianificato e reale viene riconciliata;
-- se resta non pagata genera un pendente separato.
+`MIGRATION_8_9` mantiene i dati esistenti e converte le allocazioni FIXED_EXPENSE gia' presenti nel nuovo modello.
 
-## 9. Persistenza
-Room v8 introduce:
-- `house_categories.behavior` con default `BUDGET`;
-- `house_monthly_allocations.categoryBehavior`;
-- `house_monthly_allocations.fixedExpensePaymentStatus`;
-- metadati fixed expense in `house_month_category_closings`;
-- `house_month_closings.unreconciledFixedExpenseDeficitCents`;
-- `house_fixed_expense_pendings`.
+Le `Nuove risorse Casa abituali` sono una preferenza utente DataStore, non un dato storico mensile: il valore effettivamente usato nel mese continua a essere persistito in `house_months.totalResourcesCents`.
 
-Migrazione:
-- `MIGRATION_7_8` conserva i dati esistenti;
-- tutte le categorie e allocazioni precedenti vengono interpretate come `BUDGET` fino a modifica esplicita.
-
-Quando una categoria viene trasformata in spesa fissa mentre esiste un mese OPEN, il comportamento mensile del mese OPEN viene riallineato per permettere l'uso immediato della feature. I mesi CLOSED non vengono reinterpretati.
-
-## 10. Analisi futura
+## 14. Analisi futura
 Dati da preservare:
 - comportamento categoria nel mese;
-- pianificato;
+- valore abituale globale;
+- pianificato mensile;
+- prefunding;
+- quota da nuove risorse;
 - reale;
-- differenza;
+- rettifica;
 - stato pagata/non pagata;
 - scelta di chiusura;
 - pendenti e tempi di risoluzione;
 - deficit non riconciliati;
-- destinazione degli importi liberati.
+- destinazione degli importi liberati e dei prefinanziamenti.
 
-Questi dati possono supportare in futuro indicatori come:
-- spese fisse sistematicamente sottostimate;
-- spese fisse sovrastimate;
-- pagamenti spesso pendenti alla chiusura;
-- tempi medi di pagamento dopo il mese di pianificazione;
-- frequenza delle discrepanze.
+Questi dati permetteranno indicatori su stabilita' delle spese fisse, sotto/sovrastima, frequenza dei pendenti e uso ricorrente del prefunding.
