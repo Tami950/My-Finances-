@@ -152,24 +152,45 @@ fun CreateHousePlanScreen(
 
             item(key = "summary-divider") { HorizontalDivider() }
             item(key = "summary") {
+                val freeInitialCents = state.totalResourcesCents + state.openingAvailableCents
+                val previouslyBoundCents = state.openingBalanceCents +
+                    state.prefundedFixedExpensesCents + state.pendingFixedExpensesCents
+
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(stringResource(R.string.house_plan_summary), style = MaterialTheme.typography.titleMedium)
+
+                    Text(
+                        stringResource(R.string.house_summary_month_planning),
+                        style = MaterialTheme.typography.titleSmall
+                    )
                     SummaryRow(stringResource(R.string.house_summary_resources), state.totalResourcesCents)
-                    if (state.openingAvailableCents > 0) SummaryRow(
-                        stringResource(R.string.house_summary_opening_available), state.openingAvailableCents
-                    )
-                    SummaryRow(stringResource(R.string.house_summary_allocated), state.allocatedCents)
+                    SummaryRow(stringResource(R.string.house_summary_opening_available), state.openingAvailableCents)
+                    SummaryRow(stringResource(R.string.house_summary_free_initial), freeInitialCents)
+                    SummaryRow(stringResource(R.string.house_summary_new_allocations), state.allocatedCents)
                     SummaryRow(stringResource(R.string.house_summary_unallocated), state.availableCents)
-                    if (state.openingBalanceCents > 0) SummaryRow(
-                        stringResource(R.string.house_summary_opening), state.openingBalanceCents
-                    )
-                    if (state.prefundedFixedExpensesCents > 0) SummaryRow(
-                        stringResource(R.string.house_summary_prefunded_fixed), state.prefundedFixedExpensesCents
-                    )
-                    if (state.pendingFixedExpensesCents > 0) SummaryRow(
-                        stringResource(R.string.house_summary_pending_fixed), state.pendingFixedExpensesCents
-                    )
+
+                    if (previouslyBoundCents > 0) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.house_summary_already_bound),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        if (state.openingBalanceCents > 0) SummaryRow(
+                            stringResource(R.string.house_summary_opening), state.openingBalanceCents
+                        )
+                        if (state.prefundedFixedExpensesCents > 0) SummaryRow(
+                            stringResource(R.string.house_summary_prefunded_fixed), state.prefundedFixedExpensesCents
+                        )
+                        if (state.pendingFixedExpensesCents > 0) SummaryRow(
+                            stringResource(R.string.house_summary_pending_fixed), state.pendingFixedExpensesCents
+                        )
+                        SummaryRow(stringResource(R.string.house_summary_bound_total), previouslyBoundCents)
+                    }
+
+                    Spacer(Modifier.height(6.dp))
+                    HorizontalDivider()
                     SummaryRow(stringResource(R.string.house_summary_total_funds), state.totalHouseFundsCents)
+
                     if (state.hasAllocationOverflow) {
                         Text(
                             stringResource(R.string.house_allocation_overflow_error, formatCents(state.allocationOverflowCents)),
