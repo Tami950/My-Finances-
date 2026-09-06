@@ -129,9 +129,11 @@ class CreateHousePlanViewModel @Inject constructor(
                         previous[category.id]?.copy(category = category)
                             ?: HousePlanCategoryDraftUi(
                                 category = category,
-                                openingBalanceText = formatCentsForInput(
-                                    carryover?.categoryOpeningCents?.get(category.id) ?: 0
-                                )
+                                openingBalanceText = carryover?.let { loaded ->
+                                    formatCentsForInput(
+                                        loaded.categoryOpeningCents[category.id] ?: 0
+                                    )
+                                }.orEmpty()
                             )
                     }
                 )
