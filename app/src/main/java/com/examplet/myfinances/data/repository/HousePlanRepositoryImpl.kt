@@ -1,12 +1,14 @@
 package com.examplet.myfinances.data.repository
 
 import androidx.room.withTransaction
+import com.examplet.myfinances.data.dao.FixedExpensePendingDao
 import com.examplet.myfinances.data.dao.HouseCategoryDao
 import com.examplet.myfinances.data.dao.HouseMonthAccountBalanceDao
 import com.examplet.myfinances.data.dao.HouseMonthClosingDao
 import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.db.MyFinancesDatabase
+import com.examplet.myfinances.data.entity.FixedExpensePendingEntity
 import com.examplet.myfinances.data.entity.HouseMonthAccountBalanceEntity
 import com.examplet.myfinances.data.entity.HouseMonthAvailableClosingTransferEntity
 import com.examplet.myfinances.data.entity.HouseMonthCategoryClosingEntity
@@ -14,6 +16,10 @@ import com.examplet.myfinances.data.entity.HouseMonthClosingEntity
 import com.examplet.myfinances.data.entity.HouseMonthClosingTransferEntity
 import com.examplet.myfinances.data.entity.HouseMonthEntity
 import com.examplet.myfinances.data.entity.HouseMonthlyAllocationEntity
+import com.examplet.myfinances.domain.model.FixedExpenseClosingAction
+import com.examplet.myfinances.domain.model.FixedExpensePaymentStatus
+import com.examplet.myfinances.domain.model.FixedExpensePending
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseClosingDestinationType
 import com.examplet.myfinances.domain.model.HouseMonthCarryover
 import com.examplet.myfinances.domain.model.HouseMonthClosingDraft
@@ -36,7 +42,8 @@ class HousePlanRepositoryImpl @Inject constructor(
     private val allocationDao: HouseMonthlyAllocationDao,
     private val accountBalanceDao: HouseMonthAccountBalanceDao,
     private val categoryDao: HouseCategoryDao,
-    private val closingDao: HouseMonthClosingDao
+    private val closingDao: HouseMonthClosingDao,
+    private val pendingDao: FixedExpensePendingDao
 ) : HousePlanRepository {
 
     override fun observeSummary(year: Int, month: Int): Flow<HousePlanSummary?> =
@@ -78,6 +85,8 @@ class HousePlanRepositoryImpl @Inject constructor(
                         categoryName = row.categoryName,
                         categoryType = row.categoryType,
                         targetCents = row.targetCents,
+                        categoryBehavior = row.categoryBehavior,
+                        fixedExpensePaymentStatus = row.fixedExpensePaymentStatus,
                         openingBalanceCents = row.openingBalanceCents,
                         allocatedCents = row.allocatedCents
                     )
@@ -94,6 +103,23 @@ class HousePlanRepositoryImpl @Inject constructor(
             )
         }
     }
+
+    override fun observePendingFixedExpenses(): Flow<List<FixedExpensePending>> =
+        pendingDao.observePending().map { rows ->
+            rows.map { row ->
+                FixedExpensePending(
+                    id = row.id,
+                    sourceHouseMonthId = row.sourceHouseMonthId,
+                    sourceYear = row.sourceYear,
+                    sourceMonth = row.sourceMonth,
+                    categoryId = row.categoryId,
+                    categoryName = row.categoryName,
+                    amountCents = row.amountCents,
+                    note = row.note,
+                    status = row.status
+                )
+            }
+        }
 
     override suspend fun getCarryoverFor(year: Int, month: Int): HouseMonthCarryover {
         val (previousYear, previousMonth) = previousMonthOf(year, month)
@@ -159,6 +185,12 @@ class HousePlanRepositoryImpl @Inject constructor(
                     HouseMonthlyAllocationEntity(
                         houseMonthId = houseMonthId,
                         categoryId = allocation.categoryId,
+                        categoryBehavior = allocation.categoryBehavior,
+                        fixedExpensePaymentStatus = if (
+                            allocation.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE
+                        ) {
+                            allocation.fixedExpensePaymentStatus ?: FixedExpensePaymentStatus.PLANNED
+                        } else null,
                         openingBalanceCents = allocation.openingBalanceCents,
                         allocatedCents = allocation.allocatedCents,
                         createdAt = now,
@@ -254,10 +286,7 @@ class HousePlanRepositoryImpl @Inject constructor(
                 )
                 when {
                     item.amountCents == 0L && current != null ->
-                        accountBalanceDao.deleteByMonthAndAccount(
-                            houseMonthId,
-                            item.moneyAccountId
-                        )
+                        accountBalanceDao.deleteByMonthAndAccount(houseMonthId, item.moneyAccountId)
 
                     item.amountCents > 0L && current == null ->
                         accountBalanceDao.insert(
@@ -272,14 +301,37 @@ class HousePlanRepositoryImpl @Inject constructor(
 
                     item.amountCents > 0L && current != null ->
                         accountBalanceDao.update(
-                            current.copy(
-                                amountCents = item.amountCents,
-                                updatedAt = now
-                            )
+                            current.copy(amountCents = item.amountCents, updatedAt = now)
                         )
                 }
             }
         }
+    }
+
+    override suspend fun setFixedExpensePaid(
+        houseMonthId: Long,
+        categoryId: Long,
+        isPaid: Boolean
+    ) {
+        database.withTransaction {
+            requireOpenMonth(houseMonthId)
+            val allocation = requireNotNull(
+                allocationDao.getByMonthAndCategory(houseMonthId, categoryId)
+            ) { "Categoria del mese non trovata" }
+            require(allocation.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                "La categoria non è una spesa fissa"
+            }
+            allocationDao.updateFixedExpensePaymentStatus(
+                houseMonthId = houseMonthId,
+                categoryId = categoryId,
+                status = if (isPaid) FixedExpensePaymentStatus.PAID else FixedExpensePaymentStatus.PLANNED,
+                updatedAt = System.currentTimeMillis()
+            )
+        }
+    }
+
+    override suspend fun markPendingFixedExpensePaid(pendingId: Long) {
+        pendingDao.markPaid(pendingId, System.currentTimeMillis())
     }
 
     override suspend fun closeMonth(draft: HouseMonthClosingDraft) {
@@ -291,37 +343,41 @@ class HousePlanRepositoryImpl @Inject constructor(
 
             val allocations = allocationDao.getForMonth(month.id)
             val allocationByCategory = allocations.associateBy { it.categoryId }
-            require(draft.categories.map { it.categoryId }.toSet() == allocationByCategory.keys) {
+            val draftByCategory = draft.categories.associateBy { it.categoryId }
+            require(draftByCategory.keys == allocationByCategory.keys) {
                 "La chiusura deve includere tutte le categorie del mese"
             }
 
             val activeCategoryIds = categoryDao.getActiveCategories().map { it.id }.toSet()
-            val allocatedCents = allocations.sumOf { it.allocatedCents }
-            val calculatedAvailable =
-                month.openingAvailableCents + month.totalResourcesCents - allocatedCents
-            require(calculatedAvailable >= 0) { "Il Disponibile calcolato non può essere negativo" }
+            val baseAvailable =
+                month.openingAvailableCents + month.totalResourcesCents -
+                    allocations.sumOf { it.allocatedCents }
+            require(baseAvailable >= 0) { "Il Disponibile calcolato non può essere negativo" }
+
+            val fixedExpenseDeficit = allocations
+                .filter { it.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE }
+                .sumOf { allocation ->
+                    val categoryDraft = requireNotNull(draftByCategory[allocation.categoryId])
+                    (categoryDraft.confirmedBalanceCents -
+                        (allocation.openingBalanceCents + allocation.allocatedCents)).coerceAtLeast(0)
+                }
+            val calculatedAvailable = (baseAvailable - fixedExpenseDeficit).coerceAtLeast(0)
+            val unreconciledFixedExpenseDeficit =
+                (fixedExpenseDeficit - baseAvailable).coerceAtLeast(0)
+
+            if (unreconciledFixedExpenseDeficit > 0) {
+                require(draft.confirmUnreconciledFixedExpenseDeficit) {
+                    "Le spese fisse superano il Disponibile: conferma la discrepanza prima di chiudere"
+                }
+            }
             require(draft.confirmedAvailableCents >= 0) {
                 "Il Disponibile confermato non può essere negativo"
             }
 
-            require(draft.availableTransfers.all { it.amountCents >= 0 }) {
-                "Gli importi spostati dal Disponibile non possono essere negativi"
-            }
-            val positiveAvailableTransfers = draft.availableTransfers.filter { it.amountCents > 0 }
-            require(
-                positiveAvailableTransfers.map { it.destinationCategoryId }.distinct().size ==
-                    positiveAvailableTransfers.size
-            ) {
-                "La stessa categoria non può ricevere due trasferimenti dal Disponibile"
-            }
-            positiveAvailableTransfers.forEach { transfer ->
-                require(transfer.destinationCategoryId in activeCategoryIds) {
-                    "La categoria di destinazione del Disponibile deve essere attiva"
-                }
-            }
-            require(positiveAvailableTransfers.sumOf { it.amountCents } <= draft.confirmedAvailableCents) {
-                "Non puoi spostare più del Disponibile confermato"
-            }
+            validateAvailableTransfers(
+                draft = draft,
+                activeCategoryIds = activeCategoryIds
+            )
 
             val now = System.currentTimeMillis()
             closingDao.insertMonthClosing(
@@ -331,11 +387,13 @@ class HousePlanRepositoryImpl @Inject constructor(
                     confirmedAvailableCents = draft.confirmedAvailableCents,
                     availableAdjustmentCents = draft.confirmedAvailableCents - calculatedAvailable,
                     availableAdjustmentNote = normalizedNote(draft.availableAdjustmentNote),
+                    unreconciledFixedExpenseDeficitCents = unreconciledFixedExpenseDeficit,
                     createdAt = now,
                     updatedAt = now
                 )
             )
 
+            val positiveAvailableTransfers = draft.availableTransfers.filter { it.amountCents > 0 }
             if (positiveAvailableTransfers.isNotEmpty()) {
                 closingDao.insertAvailableTransfers(
                     positiveAvailableTransfers.map { transfer ->
@@ -351,62 +409,74 @@ class HousePlanRepositoryImpl @Inject constructor(
 
             val transferEntities = mutableListOf<HouseMonthClosingTransferEntity>()
 
-            draft.categories.forEach { categoryDraft ->
-                val allocation = requireNotNull(allocationByCategory[categoryDraft.categoryId]) {
-                    "Categoria della chiusura non trovata"
-                }
-                val calculatedBalance =
+            allocations.forEach { allocation ->
+                val categoryDraft = requireNotNull(draftByCategory[allocation.categoryId])
+                val plannedOrCalculated =
                     allocation.openingBalanceCents + allocation.allocatedCents
                 require(categoryDraft.confirmedBalanceCents >= 0) {
                     "Il saldo confermato non può essere negativo"
                 }
-
-                val positiveTransfers = categoryDraft.transfers.filter { it.amountCents > 0 }
-                require(categoryDraft.transfers.all { it.amountCents >= 0 }) {
-                    "Le destinazioni del residuo non possono essere negative"
-                }
-                require(positiveTransfers.sumOf { it.amountCents } == categoryDraft.confirmedBalanceCents) {
-                    "Il residuo della categoria deve essere distribuito completamente"
+                require(categoryDraft.categoryBehavior == allocation.categoryBehavior) {
+                    "Il comportamento della categoria non coincide con quello del mese"
                 }
 
-                val destinationKeys = positiveTransfers.map {
-                    it.destinationType to it.destinationCategoryId
-                }
-                require(destinationKeys.distinct().size == destinationKeys.size) {
-                    "La stessa destinazione non può essere inserita più volte"
-                }
-
-                positiveTransfers.forEach { transfer ->
-                    when (transfer.destinationType) {
-                        HouseClosingDestinationType.CATEGORY -> {
-                            val destinationId = requireNotNull(transfer.destinationCategoryId) {
-                                "Seleziona una categoria di destinazione"
-                            }
-                            require(destinationId in activeCategoryIds) {
-                                "La categoria di destinazione deve essere attiva"
+                val expectedTransferTotal = when (allocation.categoryBehavior) {
+                    HouseCategoryBehavior.BUDGET -> categoryDraft.confirmedBalanceCents
+                    HouseCategoryBehavior.FIXED_EXPENSE -> {
+                        val action = requireNotNull(categoryDraft.fixedExpenseClosingAction) {
+                            "Indica cosa è successo alla spesa fissa"
+                        }
+                        if (action == FixedExpenseClosingAction.CANCELLED) {
+                            require(categoryDraft.confirmedBalanceCents == 0L) {
+                                "Una spesa fissa annullata deve avere importo reale zero"
                             }
                         }
-
-                        HouseClosingDestinationType.AVAILABLE -> {
-                            require(transfer.destinationCategoryId == null) {
-                                "Il Disponibile non usa una categoria di destinazione"
+                        if (action == FixedExpenseClosingAction.KEEP_PENDING) {
+                            require(categoryDraft.confirmedBalanceCents > 0) {
+                                "Una spesa pendente deve avere un importo maggiore di zero"
                             }
                         }
+                        (plannedOrCalculated - categoryDraft.confirmedBalanceCents).coerceAtLeast(0)
                     }
                 }
+
+                val positiveTransfers = validateCategoryTransfers(
+                    categoryDraft = categoryDraft,
+                    expectedTotal = expectedTransferTotal,
+                    activeCategoryIds = activeCategoryIds
+                )
 
                 closingDao.insertCategoryClosing(
                     HouseMonthCategoryClosingEntity(
                         houseMonthId = month.id,
                         categoryId = categoryDraft.categoryId,
-                        calculatedBalanceCents = calculatedBalance,
+                        categoryBehavior = allocation.categoryBehavior,
+                        fixedExpenseClosingAction = categoryDraft.fixedExpenseClosingAction,
+                        fixedExpensePendingNote = normalizedNote(categoryDraft.fixedExpensePendingNote),
+                        calculatedBalanceCents = plannedOrCalculated,
                         confirmedBalanceCents = categoryDraft.confirmedBalanceCents,
-                        adjustmentCents = categoryDraft.confirmedBalanceCents - calculatedBalance,
+                        adjustmentCents = categoryDraft.confirmedBalanceCents - plannedOrCalculated,
                         adjustmentNote = normalizedNote(categoryDraft.adjustmentNote),
                         createdAt = now,
                         updatedAt = now
                     )
                 )
+
+                if (
+                    allocation.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE &&
+                    categoryDraft.fixedExpenseClosingAction == FixedExpenseClosingAction.KEEP_PENDING
+                ) {
+                    pendingDao.insert(
+                        FixedExpensePendingEntity(
+                            sourceHouseMonthId = month.id,
+                            categoryId = categoryDraft.categoryId,
+                            amountCents = categoryDraft.confirmedBalanceCents,
+                            note = normalizedNote(categoryDraft.fixedExpensePendingNote),
+                            createdAt = now,
+                            updatedAt = now
+                        )
+                    )
+                }
 
                 positiveTransfers.forEach { transfer ->
                     transferEntities += HouseMonthClosingTransferEntity(
@@ -432,6 +502,62 @@ class HousePlanRepositoryImpl @Inject constructor(
                 )
             )
         }
+    }
+
+    private fun validateAvailableTransfers(
+        draft: HouseMonthClosingDraft,
+        activeCategoryIds: Set<Long>
+    ) {
+        require(draft.availableTransfers.all { it.amountCents >= 0 }) {
+            "Gli importi spostati dal Disponibile non possono essere negativi"
+        }
+        val positive = draft.availableTransfers.filter { it.amountCents > 0 }
+        require(positive.map { it.destinationCategoryId }.distinct().size == positive.size) {
+            "La stessa categoria non può ricevere due trasferimenti dal Disponibile"
+        }
+        positive.forEach { transfer ->
+            require(transfer.destinationCategoryId in activeCategoryIds) {
+                "La categoria di destinazione del Disponibile deve essere attiva"
+            }
+        }
+        require(positive.sumOf { it.amountCents } <= draft.confirmedAvailableCents) {
+            "Non puoi spostare più del Disponibile confermato"
+        }
+    }
+
+    private fun validateCategoryTransfers(
+        categoryDraft: com.examplet.myfinances.domain.model.HouseCategoryClosingDraft,
+        expectedTotal: Long,
+        activeCategoryIds: Set<Long>
+    ): List<com.examplet.myfinances.domain.model.HouseClosingTransferDraft> {
+        require(categoryDraft.transfers.all { it.amountCents >= 0 }) {
+            "Le destinazioni del residuo non possono essere negative"
+        }
+        val positive = categoryDraft.transfers.filter { it.amountCents > 0 }
+        require(positive.sumOf { it.amountCents } == expectedTotal) {
+            "L'importo da riallocare deve essere distribuito completamente"
+        }
+        val destinationKeys = positive.map { it.destinationType to it.destinationCategoryId }
+        require(destinationKeys.distinct().size == destinationKeys.size) {
+            "La stessa destinazione non può essere inserita più volte"
+        }
+        positive.forEach { transfer ->
+            when (transfer.destinationType) {
+                HouseClosingDestinationType.CATEGORY -> {
+                    val destinationId = requireNotNull(transfer.destinationCategoryId) {
+                        "Seleziona una categoria di destinazione"
+                    }
+                    require(destinationId in activeCategoryIds) {
+                        "La categoria di destinazione deve essere attiva"
+                    }
+                }
+
+                HouseClosingDestinationType.AVAILABLE -> require(transfer.destinationCategoryId == null) {
+                    "Il Disponibile non usa una categoria di destinazione"
+                }
+            }
+        }
+        return positive
     }
 
     private suspend fun requireOpenMonth(houseMonthId: Long): HouseMonthEntity {
@@ -466,11 +592,7 @@ class HousePlanRepositoryImpl @Inject constructor(
         require(draft.allocations.isNotEmpty()) {
             "Serve almeno una categoria Casa disponibile"
         }
-        require(
-            draft.allocations.all {
-                it.openingBalanceCents >= 0 && it.allocatedCents >= 0
-            }
-        ) {
+        require(draft.allocations.all { it.openingBalanceCents >= 0 && it.allocatedCents >= 0 }) {
             "Gli importi delle categorie non possono essere negativi"
         }
 
