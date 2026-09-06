@@ -1,5 +1,6 @@
 package com.examplet.myfinances.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -15,6 +16,7 @@ data class HouseMonthEntity(
     val year: Int,
     val month: Int,
     val totalResourcesCents: Long,
+    @ColumnInfo(defaultValue = "0")
     val openingAvailableCents: Long = 0,
     val note: String? = null,
     val status: HouseMonthStatus = HouseMonthStatus.OPEN,
