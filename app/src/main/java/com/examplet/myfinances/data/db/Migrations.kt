@@ -103,3 +103,56 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         )
     }
 }
+
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE house_categories ADD COLUMN behavior TEXT NOT NULL DEFAULT 'BUDGET'"
+        )
+        db.execSQL(
+            "ALTER TABLE house_monthly_allocations ADD COLUMN categoryBehavior TEXT NOT NULL DEFAULT 'BUDGET'"
+        )
+        db.execSQL(
+            "ALTER TABLE house_monthly_allocations ADD COLUMN fixedExpensePaymentStatus TEXT"
+        )
+        db.execSQL(
+            "ALTER TABLE house_month_category_closings ADD COLUMN categoryBehavior TEXT NOT NULL DEFAULT 'BUDGET'"
+        )
+        db.execSQL(
+            "ALTER TABLE house_month_category_closings ADD COLUMN fixedExpenseClosingAction TEXT"
+        )
+        db.execSQL(
+            "ALTER TABLE house_month_category_closings ADD COLUMN fixedExpensePendingNote TEXT"
+        )
+        db.execSQL(
+            "ALTER TABLE house_month_closings ADD COLUMN unreconciledFixedExpenseDeficitCents INTEGER NOT NULL DEFAULT 0"
+        )
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `house_fixed_expense_pendings` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `sourceHouseMonthId` INTEGER NOT NULL,
+                `categoryId` INTEGER NOT NULL,
+                `amountCents` INTEGER NOT NULL,
+                `note` TEXT,
+                `status` TEXT NOT NULL,
+                `resolvedAt` INTEGER,
+                `createdAt` INTEGER NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                FOREIGN KEY(`sourceHouseMonthId`) REFERENCES `house_months`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY(`categoryId`) REFERENCES `house_categories`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_sourceHouseMonthId` ON `house_fixed_expense_pendings` (`sourceHouseMonthId`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_categoryId` ON `house_fixed_expense_pendings` (`categoryId`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_status` ON `house_fixed_expense_pendings` (`status`)"
+        )
+    }
+}
