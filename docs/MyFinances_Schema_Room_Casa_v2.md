@@ -1,15 +1,16 @@
 # MyFinances - Schema Room Casa v2
 
-Data: 30 agosto 2026
+Data: 6 settembre 2026
 Stato: schema logico corrente e prossime estensioni necessarie alla Pianificazione
 
 ## 1. Principi
 - Il denaro usa Long in centesimi.
 - Le categorie sono concetti logici persistenti.
 - I money account sono contenitori fisici generali.
-- Il piano mensile collega risorse, categorie e posizioni fisiche.
+- Il piano mensile collega risorse, categorie, Disponibile e posizioni fisiche.
 - Lo stato di chiusura appartiene al mese.
 - La posizione fisica e' uno snapshot corrente, non uno storico movimenti.
+- I dati grezzi utili alla futura Analisi & Suggerimenti non devono essere persi o sovrascritti.
 
 ## 2. Tabelle correnti
 
@@ -28,11 +29,6 @@ MoneyAccountType:
 - BANK_ACCOUNT
 - CARD
 - OTHER
-
-Note:
-- descrive il contenitore fisico;
-- non contiene direttamente il saldo totale dell'account;
-- puo' essere riutilizzato anche da Personale.
 
 ### 2.2 house_categories
 Campi correnti:
@@ -55,10 +51,6 @@ Vincoli:
 - TARGET richiede targetCents > 0;
 - FLEXIBLE usa targetCents = null.
 
-Estensioni future candidate:
-- flag per evidenziazione Dashboard;
-- eventuali preferenze di visualizzazione.
-
 ### 2.3 house_months
 Campi correnti:
 - id: Long PK autoGenerate
@@ -80,11 +72,9 @@ Vincolo unico:
 
 Regole:
 - un solo mese per coppia anno/mese;
-- totalResourcesCents >= 0;
 - un nuovo mese nasce OPEN;
 - CLOSED implica mese storico e non modificabile dai flussi ordinari;
-- non creare il mese successivo se il precedente esiste ed e' OPEN;
-- closedAt resta null per OPEN e verra' valorizzato dal futuro flusso di chiusura mese.
+- non creare il mese successivo se il precedente esiste ed e' OPEN.
 
 ### 2.4 house_monthly_allocations
 Campi:
@@ -99,13 +89,8 @@ Campi:
 Vincolo unico:
 - (houseMonthId, categoryId)
 
-Derivati:
-- categoryTotalCents = openingBalanceCents + allocatedCents
-
-Regole:
-- openingBalanceCents >= 0;
-- allocatedCents >= 0;
-- somma allocatedCents del mese <= house_months.totalResourcesCents.
+Derivato iniziale:
+- categoryTotalCents = openingBalanceCents + allocatedCents.
 
 ### 2.5 house_month_account_balances
 Campi:
@@ -117,174 +102,229 @@ Campi:
 - updatedAt: Long
 
 Vincolo unico:
-- (houseMonthId, moneyAccountId)
+- (houseMonthId, moneyAccountId).
 
 Regole:
 - amountCents >= 0;
 - somma amountCents <= totalResourcesCents;
-- differenza positiva = denaro Casa ancora non posizionato/riconciliato;
-- nessun euro deve essere contato contemporaneamente su due posizioni;
-- una posizione a zero puo' non avere una riga persistita.
+- una posizione a zero puo' non avere riga persistita.
 
-## 3. Opening balance e mese precedente
-Obiettivo definitivo:
-- il residuo finale consolidato di agosto alimenta openingBalanceCents di settembre per la stessa categoria;
-- se il dato non esiste -> 0;
-- il valore suggerito resta modificabile.
+## 3. Disponibile Casa
+`Disponibile` sostituisce semanticamente `Da allocare`.
 
-Per calcolare il residuo finale servira' il modello movimenti/spese e/o la chiusura mese.
+Prima dei movimenti:
+- availableCents = totalResourcesCents - somma allocatedCents.
 
-La chiusura mese deve avvenire prima della pianificazione del mese successivo quando il mese precedente esiste.
+Con i movimenti:
+- availableCurrentCents = risorse - allocazioni - uscite dal Disponibile + entrate/rettifiche sul Disponibile.
+
+Il Disponibile non e' una categoria fittizia.
+
+Le somme destinate al Disponibile durante una chiusura devono essere preservate separatamente dagli opening delle categorie.
 
 ## 4. Stato mese
-HouseMonthStatus e' ora persistito direttamente in house_months.
+HouseMonthStatus e' persistito direttamente in house_months.
 
 Regole implementate:
-- createPlan crea sempre il mese in stato OPEN;
-- updatePlan e updatePositions rifiutano mesi CLOSED;
-- createPlan controlla il mese precedente: se esiste ed e' OPEN, la nuova pianificazione viene rifiutata.
+- createPlan crea OPEN;
+- updatePlan e updatePositions rifiutano CLOSED;
+- createPlan controlla il mese precedente e rifiuta se OPEN.
 
-Non usare DataStore/AppPreferences per isHouseMonthClosed, perche' la chiusura e' una proprieta' storica di ogni singolo mese.
+La chiusura deve valorizzare closedAt e portare OPEN -> CLOSED nella stessa transazione che salva i dati di chiusura.
 
-La transizione OPEN -> CLOSED e la valorizzazione di closedAt verranno implementate con il flusso di chiusura mese.
+## 5. Nuova struttura di chiusura mese
+La chiusura deve conservare sia il risultato reale sia il confronto con quanto l'app aveva calcolato.
 
-## 5. Categoria nascosta dal mese
-Requisito nuovo: una categoria globale puo' essere nascosta/esclusa da uno specifico mese senza archiviarla globalmente.
+### 5.1 house_month_category_closings
+Tabella prevista/da implementare nel prossimo schema.
 
-Soluzione dati da scegliere prima dell'implementazione. Opzioni:
-1. aggiungere isHiddenInMonth a house_monthly_allocations;
-2. introdurre tabella di membership/configurazione del mese;
-3. considerare assenza di allocation come esclusione.
+Campi proposti:
+- id: Long PK autoGenerate
+- houseMonthId: Long FK -> house_months CASCADE
+- categoryId: Long FK -> house_categories NO_ACTION
+- calculatedBalanceCents: Long
+- confirmedBalanceCents: Long
+- adjustmentCents: Long
+- adjustmentNote: String?
+- createdAt: Long
+- updatedAt: Long
 
-Preferenza preliminare: mantenere una riga mensile anche per categorie incluse a zero e usare un attributo mensile esplicito se serve distinguere "zero" da "nascosta".
+Vincolo unico:
+- (houseMonthId, categoryId).
 
-## 6. Movimenti categoria - estensione futura
-Serve una struttura append-only per tracciare operazioni su una categoria del mese, ad esempio:
-- spesa/uscita;
+Regole:
+- calculatedBalanceCents >= 0 nella prima versione senza overspending esplicito;
+- confirmedBalanceCents >= 0;
+- adjustmentCents = confirmedBalanceCents - calculatedBalanceCents;
+- non riscrivere allocazioni o movimenti per nascondere la discrepanza.
+
+Quando arriveranno i movimenti, il saldo calcolato sara' derivato da opening + allocazioni + entrate - uscite +/- rettifiche. Fino ad allora il calcolato iniziale coincide con opening + allocated e il confermato resta liberamente correggibile.
+
+### 5.2 house_month_closing_transfers
+Tabella prevista/da implementare nel prossimo schema.
+
+Scopo: conservare come ogni residuo confermato viene destinato al mese successivo.
+
+Campi proposti:
+- id: Long PK autoGenerate
+- houseMonthId: Long FK -> house_months CASCADE
+- sourceCategoryId: Long FK -> house_categories NO_ACTION
+- destinationType: HouseClosingDestinationType
+- destinationCategoryId: Long? FK -> house_categories NO_ACTION
+- amountCents: Long
+- createdAt: Long
+
+HouseClosingDestinationType:
+- CATEGORY
+- AVAILABLE
+
+Regole:
+- amountCents > 0;
+- CATEGORY richiede destinationCategoryId != null;
+- AVAILABLE richiede destinationCategoryId = null;
+- per ogni sourceCategoryId, somma transfer.amountCents = confirmedBalanceCents della relativa chiusura;
+- la stessa categoria come sorgente/destinazione rappresenta "Mantieni";
+- split tra piu' destinazioni e' consentito;
+- nessun Fondo Casa separato nella prima versione.
+
+Questa tabella conserva la provenienza storica del denaro e consente di derivare gli opening del mese successivo senza perdere informazione.
+
+## 6. Autocompletamento del mese successivo
+Per una categoria destinazione X:
+- suggestedOpening(X) = somma amountCents dei closing transfers del precedente mese CLOSED con destinationType=CATEGORY e destinationCategoryId=X.
+
+Se nessun transfer -> 0.
+
+Il suggerimento resta modificabile.
+
+Per il Disponibile:
+- transferredAvailableCents = somma transfer del precedente CLOSED con destinationType=AVAILABLE.
+
+Il modo in cui questa quota entra formalmente nel totale del nuovo mese deve rimanere coerente con la distinzione tra nuove risorse del mese e denaro ereditato dal precedente. Durante l'implementazione va evitato qualsiasi doppio conteggio.
+
+## 7. Categoria nascosta dal mese
+Requisito futuro: una categoria globale puo' essere nascosta/esclusa da uno specifico mese senza archiviarla globalmente.
+
+Preferenza preliminare: mantenere una riga mensile esplicita e distinguere zero da nascosta tramite attributo/configurazione mensile.
+
+## 8. Movimenti categoria e Disponibile - estensione successiva
+Serve una struttura append-only per tracciare:
+- uscita;
 - entrata;
 - rettifica.
+
+La categoria deve poter essere opzionale:
+- categoryId valorizzato -> movimento della categoria;
+- categoryId null -> movimento del Disponibile.
 
 Campi candidati:
 - id
 - houseMonthId
-- categoryId
+- categoryId?
 - type
 - amountCents
 - movementDate
 - note
 - createdAt
-- updatedAt
+- updatedAt.
 
-Questa tabella permettera' di derivare:
-- speso;
-- entrate;
-- residuo corrente;
-- residuo finale da trasferire al mese successivo.
+Questa struttura deve permettere di derivare saldi correnti e saldo calcolato di chiusura senza salvare aggregati ridondanti come fonte primaria.
 
-## 7. Movimenti tra posizioni - estensione futura
+## 9. Movimenti tra posizioni - estensione futura
 Lo snapshot house_month_account_balances descrive dove si trova il denaro ora.
 
-Per tracciare come si e' spostato servira' una tabella separata, candidata:
-- house_money_movements
+Per lo storico servira' una tabella di movimenti con:
+- fromMoneyAccountId;
+- toMoneyAccountId;
+- amountCents;
+- movementDate;
+- note;
+- createdAt.
 
-Campi candidati:
-- id
-- houseMonthId
-- fromMoneyAccountId
-- toMoneyAccountId
-- amountCents
-- movementDate
-- note
-- createdAt
+Trasferimento atomico: decremento sorgente + incremento destinazione, totale Casa invariato.
 
-Regola:
-- movimento tra account non cambia il totale Casa;
-- decremento sorgente e incremento destinazione devono essere atomici.
-
-## 8. Chiusura mese - dati futuri
-La chiusura deve consolidare almeno:
-- residuo finale per categoria;
-- destinazione del residuo;
-- status CLOSED;
-- closedAt.
-
-Possibili destinazioni residue:
-- stessa categoria mese successivo;
-- altra categoria Casa;
-- fondo Casa;
-- risparmio Casa;
-- disponibile da allocare;
-- altre destinazioni deliberate.
-
-Lo schema definitivo della chiusura verra' definito quando si implementera' il relativo wizard.
-
-## 9. Delete e storico
+## 10. Delete e storico
 Archivio e delete sono separati.
 
 Hard delete futura:
 - vietata se esiste denaro non riallocato;
-- deve chiedere dove spostarlo;
-- non deve invalidare record storici.
+- non deve invalidare record storici;
+- prima del codice va scelta una strategia tra soft-delete definitivo, snapshot storico o altra soluzione coerente.
 
-Dato che house_monthly_allocations usa FK NO_ACTION verso house_categories, una categoria referenziata dalla storia non puo' essere cancellata senza una strategia esplicita. Prima di implementare delete reale va deciso se usare:
-- soft delete permanente per entita' storiche;
-- snapshot del nome/tipo nel record mensile;
-- altra strategia di preservazione storico.
+Le nuove tabelle di chiusura aumentano l'importanza di questa decisione: categoryId puo' essere referenziato da allocazioni, closings e transfers.
 
-## 10. Transazioni
-Creazione del piano:
-- insert house_months;
-- insert house_monthly_allocations;
-- insert house_month_account_balances;
+## 11. Transazioni
+Devono essere atomiche:
+- creazione piano;
+- modifica pianificazione;
+- modifica posizioni;
+- chiusura mese;
+- futuri trasferimenti tra posizioni.
 
-devono avvenire in una sola transazione Room.
+Chiusura mese atomica:
+1. validare mese OPEN;
+2. validare confirmed balances;
+3. validare per ogni categoria somma transfer = confirmed balance;
+4. insert/update house_month_category_closings;
+5. insert house_month_closing_transfers;
+6. update house_months status=CLOSED, closedAt=now, updatedAt=now.
 
-Modifica pianificazione esistente:
-- update house_months;
-- update delle allocazioni mensili interessate;
-- validazione delle posizioni gia' esistenti rispetto alle nuove risorse;
+Se qualunque passaggio fallisce, il mese resta OPEN e nessuna chiusura parziale deve essere persistita.
 
-deve essere atomica.
-
-Modifica posizioni:
-- insert/update/delete dei singoli house_month_account_balances;
-- validazione della somma rispetto alle risorse del mese;
-
-deve essere atomica e separata dalla modifica della pianificazione logica.
-
-Anche i futuri trasferimenti tra posizioni devono essere atomici.
-
-## 11. Invarianti di dominio
-- denaro mai negativo;
-- allocato nuovo mai oltre le risorse del mese;
-- posizionato mai oltre le risorse del mese;
-- opening balance separato dalle risorse nuove;
-- un mese CLOSED non viene modificato da flussi ordinari;
-- il mese successivo richiede precedente CLOSED quando precedente esiste;
-- la posizione fisica non rappresenta la cronologia;
+## 12. Invarianti di dominio
+- denaro mai negativo nei saldi confermati;
+- allocato nuovo mai oltre le risorse;
+- posizionato mai oltre le risorse;
+- opening separato dalle nuove risorse;
+- un mese CLOSED non viene modificato dai flussi ordinari;
+- mese successivo richiede precedente CLOSED quando esiste;
+- per ogni categoria chiusa: distribuito = confermato;
+- adjustment = confermato - calcolato;
+- i transfer verso AVAILABLE non creano opening categoria;
+- i transfer verso CATEGORY concorrono all'opening suggerito del mese successivo;
 - i movimenti tra posizioni conservano il totale.
 
-Le validazioni vengono applicate sia nello stato UI/ViewModel per feedback immediato sia nel repository prima della scrittura Room.
+## 13. Preservazione dati per Analisi & Suggerimenti
+Requisito mandatorio di progetto: dopo il completamento di Casa va eseguito un audit dello schema prima di congelare il dominio.
 
-## 12. Migrazioni
-Database Room corrente: versione 5.
+Dati che non devono essere persi:
+- allocazioni mensili;
+- opening;
+- movimenti individuali;
+- saldo calcolato in chiusura;
+- saldo confermato;
+- adjustment e nota;
+- trasferimenti di chiusura sorgente -> destinazione;
+- timestamp di chiusura;
+- movimenti fisici tra posizioni.
 
-La versione 5 introduce in house_months:
-- status;
-- closedAt.
+Gli indicatori e suggerimenti saranno derivati. Evitare di usare come fonte di verita' aggregati o insight salvati quando possono essere ricalcolati dai dati primari.
 
-Durante lo sviluppo iniziale fallbackToDestructiveMigration() e' ancora temporaneamente accettato per dati di test. Il passaggio alla versione 5 puo' quindi cancellare il database locale di sviluppo.
+L'audit post-Casa dovra' verificare se servono:
+- snapshot storici aggiuntivi;
+- tabelle evento;
+- metadati sulle correzioni;
+- indici/query per analisi longitudinali;
+- eventuali versioni/snapshot delle definizioni categoria.
+
+## 14. Migrazioni
+Database Room corrente prima della chiusura: versione 5.
+
+La chiusura richiede un nuovo version bump per introdurre almeno:
+- house_month_category_closings;
+- house_month_closing_transfers;
+- relativi converter/enums.
+
+Durante lo sviluppo iniziale fallbackToDestructiveMigration() e' ancora temporaneamente accettato per dati di test.
 
 Prima dell'uso reale:
 - rimuovere fallback distruttivo;
 - abilitare export schema;
 - scrivere migrazioni Room esplicite.
 
-## 13. Nota su ID e cloud futuro
+## 15. Nota su ID e cloud futuro
 Lo schema usa attualmente PK Long autoGenerate.
 
 Prima della sincronizzazione multi-device va presa una decisione esplicita:
-- passare a UUID/String come identificatore stabile globale;
-- oppure mantenere Long locale e aggiungere un syncId globale.
-
-Non cambiare silenziosamente questo aspetto: la decisione deve essere presa prima che lo schema cloud diventi stabile.
+- UUID/String globale;
+- oppure Long locale + syncId globale.
