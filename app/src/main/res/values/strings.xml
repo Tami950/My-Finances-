@@ -91,6 +91,7 @@
     <string name="house_closing_adjusted_categories_count">Categorie con rettifica manuale: %1$d</string>
     <string name="house_closing_in_progress">Chiusura…</string>
     <string name="house_closing_fixed_destination_limit">Puoi prefinanziare al massimo %1$s per questa spesa fissa.</string>
+    <string name="house_closing_fixed_destination_global_error">Una o più spese fisse ricevono più del loro importo abituale. Riduci la distribuzione prima di continuare.</string>
 
     <string name="house_category_fixed_expense">Spesa fissa</string>
     <string name="house_category_fixed_expense_badge">Spesa fissa</string>
@@ -135,6 +136,7 @@
     <string name="house_fixed_decrease_destination">Si liberano %1$s. Dove vuoi metterli?</string>
     <string name="house_use_available">Disponibile (%1$s)</string>
     <string name="house_choose_budget_category">Categoria budget</string>
+    <string name="house_fixed_increase_no_source">Non ci sono fondi sufficienti nel Disponibile o nelle categorie budget per applicare questo aumento al mese corrente.</string>
 
     <string name="house_categories_title">Categorie Casa</string>
     <string name="house_categories_empty">Non hai ancora creato categorie.</string>
