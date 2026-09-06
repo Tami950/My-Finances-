@@ -172,7 +172,8 @@ fun CloseHouseMonthScreen(
                                 }
                             }
                         }
-                        row.adjustmentCents?.takeIf { it != 0L }?.let(::ClosingAdjustment)
+                        row.adjustmentCents?.takeIf { it != 0L }?.let { adjustment -> ClosingAdjustment(adjustment) }
+
                     }
                 }
 
@@ -259,7 +260,8 @@ fun CloseHouseMonthScreen(
                 )
                 Text(stringResource(R.string.house_fixed_expense_uncovered_confirm))
             }
-            state.availableAdjustmentCents?.takeIf { it != 0L }?.let(::ClosingAdjustment)
+            state.availableAdjustmentCents?.takeIf { it != 0L }?.let { adjustment -> ClosingAdjustment(adjustment) }
+
             val categoryAdjustments = state.categories.count { (it.adjustmentCents ?: 0) != 0L }
             if (categoryAdjustments > 0) {
                 Text(stringResource(R.string.house_closing_adjusted_categories_count, categoryAdjustments))
