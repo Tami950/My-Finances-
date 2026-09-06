@@ -43,6 +43,7 @@ data class MoneyAccountDraft(
 
 data class CasaUiState(
     val isHouseSetupCompleted: Boolean = false,
+    val isPlanningReady: Boolean = false,
     val categories: List<HouseCategory> = emptyList(),
     val moneyAccounts: List<MoneyAccount> = emptyList(),
     val currentPlan: HousePlanSummary? = null,
@@ -114,12 +115,12 @@ class CasaViewModel @Inject constructor(
         previousPlan,
         currentPlanDetails
     ) { core, accountDraft, error, plan, previous, details ->
-        val hasPlanningPrerequisites =
+        val planningReady =
             core.categories.any { !it.isArchived } && core.moneyAccounts.any { !it.isArchived }
 
         CasaUiState(
-            isHouseSetupCompleted = core.isHouseSetupCompleted &&
-                (hasPlanningPrerequisites || plan != null || previous != null),
+            isHouseSetupCompleted = core.isHouseSetupCompleted,
+            isPlanningReady = planningReady,
             categories = core.categories,
             moneyAccounts = core.moneyAccounts,
             currentPlan = plan,
