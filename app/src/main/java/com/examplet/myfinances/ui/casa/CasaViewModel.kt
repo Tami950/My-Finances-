@@ -46,6 +46,7 @@ data class CasaUiState(
     val categories: List<HouseCategory> = emptyList(),
     val moneyAccounts: List<MoneyAccount> = emptyList(),
     val currentPlan: HousePlanSummary? = null,
+    val previousPlan: HousePlanSummary? = null,
     val currentPlanDetails: HousePlanDetails? = null,
     val selectedTab: CasaTab = CasaTab.PLANNING,
     val categoryDraft: CategoryDraft? = null,
@@ -77,6 +78,7 @@ class CasaViewModel @Inject constructor(
     private val moneyAccountDraft = MutableStateFlow<MoneyAccountDraft?>(null)
     private val errorMessage = MutableStateFlow<String?>(null)
     private val currentDate = LocalDate.now()
+    private val previousDate = currentDate.minusMonths(1)
     private var entryDefaultApplied = false
 
     private val coreState = combine(
@@ -94,6 +96,11 @@ class CasaViewModel @Inject constructor(
         month = currentDate.monthValue
     )
 
+    private val previousPlan = housePlanRepository.observeSummary(
+        year = previousDate.year,
+        month = previousDate.monthValue
+    )
+
     private val currentPlanDetails = currentPlan.flatMapLatest { summary ->
         if (summary == null) flowOf(null)
         else housePlanRepository.observeDetails(summary.id)
@@ -104,20 +111,19 @@ class CasaViewModel @Inject constructor(
         moneyAccountDraft,
         errorMessage,
         currentPlan,
+        previousPlan,
         currentPlanDetails
-    ) { core, accountDraft, error, plan, details ->
+    ) { core, accountDraft, error, plan, previous, details ->
         val hasPlanningPrerequisites =
             core.categories.any { !it.isArchived } && core.moneyAccounts.any { !it.isArchived }
 
         CasaUiState(
-            // The persisted flag still means "initial setup was completed".
-            // Active customization is required only to create a new plan. An existing
-            // month remains visible even if its categories/accounts are later archived.
             isHouseSetupCompleted = core.isHouseSetupCompleted &&
-                (hasPlanningPrerequisites || plan != null),
+                (hasPlanningPrerequisites || plan != null || previous != null),
             categories = core.categories,
             moneyAccounts = core.moneyAccounts,
             currentPlan = plan,
+            previousPlan = previous,
             currentPlanDetails = details,
             selectedTab = core.selectedTab,
             categoryDraft = core.categoryDraft,
@@ -160,22 +166,41 @@ class CasaViewModel @Inject constructor(
         )
     }
 
-    fun updateCategoryDraftName(name: String) { categoryDraft.value = categoryDraft.value?.copy(name = name) }
-    fun updateCategoryDraftType(type: HouseCategoryType) { categoryDraft.value = categoryDraft.value?.copy(type = type) }
-    fun updateCategoryDraftTarget(target: String) { categoryDraft.value = categoryDraft.value?.copy(targetText = target) }
-    fun dismissCategoryDialog() { categoryDraft.value = null; errorMessage.value = null }
+    fun updateCategoryDraftName(name: String) {
+        categoryDraft.value = categoryDraft.value?.copy(name = name)
+    }
+
+    fun updateCategoryDraftType(type: HouseCategoryType) {
+        categoryDraft.value = categoryDraft.value?.copy(type = type)
+    }
+
+    fun updateCategoryDraftTarget(target: String) {
+        categoryDraft.value = categoryDraft.value?.copy(targetText = target)
+    }
+
+    fun dismissCategoryDialog() {
+        categoryDraft.value = null
+        errorMessage.value = null
+    }
 
     fun saveCategory() {
         val draft = categoryDraft.value ?: return
         viewModelScope.launch {
             runCatching {
-                val targetCents = if (draft.type == HouseCategoryType.TARGET) parseEuroToCents(draft.targetText) else null
-                if (draft.id == null) categoryRepository.createCategory(draft.name, draft.type, targetCents)
-                else categoryRepository.updateCategory(draft.id, draft.name, draft.type, targetCents)
+                val targetCents = if (draft.type == HouseCategoryType.TARGET) {
+                    parseEuroToCents(draft.targetText)
+                } else null
+                if (draft.id == null) {
+                    categoryRepository.createCategory(draft.name, draft.type, targetCents)
+                } else {
+                    categoryRepository.updateCategory(draft.id, draft.name, draft.type, targetCents)
+                }
             }.onSuccess {
                 categoryDraft.value = null
                 errorMessage.value = null
-            }.onFailure { errorMessage.value = it.message ?: "Errore durante il salvataggio" }
+            }.onFailure {
+                errorMessage.value = it.message ?: "Errore durante il salvataggio"
+            }
         }
     }
 
@@ -194,20 +219,34 @@ class CasaViewModel @Inject constructor(
         moneyAccountDraft.value = MoneyAccountDraft(account.id, account.name, account.type)
     }
 
-    fun updateMoneyAccountDraftName(name: String) { moneyAccountDraft.value = moneyAccountDraft.value?.copy(name = name) }
-    fun updateMoneyAccountDraftType(type: MoneyAccountType) { moneyAccountDraft.value = moneyAccountDraft.value?.copy(type = type) }
-    fun dismissMoneyAccountDialog() { moneyAccountDraft.value = null; errorMessage.value = null }
+    fun updateMoneyAccountDraftName(name: String) {
+        moneyAccountDraft.value = moneyAccountDraft.value?.copy(name = name)
+    }
+
+    fun updateMoneyAccountDraftType(type: MoneyAccountType) {
+        moneyAccountDraft.value = moneyAccountDraft.value?.copy(type = type)
+    }
+
+    fun dismissMoneyAccountDialog() {
+        moneyAccountDraft.value = null
+        errorMessage.value = null
+    }
 
     fun saveMoneyAccount() {
         val draft = moneyAccountDraft.value ?: return
         viewModelScope.launch {
             runCatching {
-                if (draft.id == null) moneyAccountRepository.createAccount(draft.name, draft.type)
-                else moneyAccountRepository.updateAccount(draft.id, draft.name, draft.type)
+                if (draft.id == null) {
+                    moneyAccountRepository.createAccount(draft.name, draft.type)
+                } else {
+                    moneyAccountRepository.updateAccount(draft.id, draft.name, draft.type)
+                }
             }.onSuccess {
                 moneyAccountDraft.value = null
                 errorMessage.value = null
-            }.onFailure { errorMessage.value = it.message ?: "Errore durante il salvataggio" }
+            }.onFailure {
+                errorMessage.value = it.message ?: "Errore durante il salvataggio"
+            }
         }
     }
 
