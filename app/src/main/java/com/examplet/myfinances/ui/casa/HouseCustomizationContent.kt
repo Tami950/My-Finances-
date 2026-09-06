@@ -189,8 +189,19 @@ internal fun HouseCategorySheet(
         } else it.openingBalanceCents + it.allocatedCents
     }
     val delta = if (draft.isFixedExpense && oldCurrentCents != null) newFixedCents - oldCurrentCents else 0L
-    val budgetChoices = currentPlanDetails?.allocations.orEmpty().filter {
+    val amountToReconcile = kotlin.math.abs(delta)
+    val allBudgetChoices = currentPlanDetails?.allocations.orEmpty().filter {
         it.categoryId != draft.id && it.categoryBehavior == HouseCategoryBehavior.BUDGET
+    }
+    val budgetChoices = if (delta > 0) {
+        allBudgetChoices.filter { it.openingBalanceCents + it.allocatedCents >= amountToReconcile }
+    } else allBudgetChoices
+    val available = currentPlanDetails?.availableCents ?: 0L
+    val canUseAvailable = delta <= 0 || available >= amountToReconcile
+    val selectedBudgetIsValid = budgetChoices.any { it.categoryId == draft.reallocationCategoryId }
+    val reallocationIsValid = !draft.applyToCurrentMonth || delta == 0L || when {
+        draft.useAvailableForReallocation -> canUseAvailable
+        else -> selectedBudgetIsValid
     }
 
     AppModalBottomSheet(
@@ -198,7 +209,7 @@ internal fun HouseCategorySheet(
         title = { Text(stringResource(if (draft.id == null) R.string.house_add_category else R.string.house_edit_category), style = MaterialTheme.typography.titleLarge) },
         actions = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            Button(onClick = onSave) { Text(stringResource(R.string.action_save)) }
+            Button(onClick = onSave, enabled = reallocationIsValid) { Text(stringResource(R.string.action_save)) }
         }
     ) {
         OutlinedTextField(
@@ -244,21 +255,29 @@ internal fun HouseCategorySheet(
                     Text(
                         stringResource(
                             if (delta > 0) R.string.house_fixed_increase_source else R.string.house_fixed_decrease_destination,
-                            formatHouseCents(kotlin.math.abs(delta))
+                            formatHouseCents(amountToReconcile)
                         ),
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    val available = currentPlanDetails.availableCents
-                    HouseChoiceRow(
-                        stringResource(R.string.house_use_available, formatHouseCents(available)),
-                        draft.useAvailableForReallocation
-                    ) { onUseAvailableChange(true) }
+                    if (canUseAvailable) {
+                        HouseChoiceRow(
+                            stringResource(R.string.house_use_available, formatHouseCents(available)),
+                            draft.useAvailableForReallocation
+                        ) { onUseAvailableChange(true) }
+                    }
                     budgetChoices.forEach { allocation ->
                         val amount = allocation.openingBalanceCents + allocation.allocatedCents
                         HouseChoiceRow(
                             "${allocation.categoryName} (${formatHouseCents(amount)})",
                             !draft.useAvailableForReallocation && draft.reallocationCategoryId == allocation.categoryId
                         ) { onReallocationCategoryChange(allocation.categoryId) }
+                    }
+                    if (delta > 0 && !canUseAvailable && budgetChoices.isEmpty()) {
+                        Text(
+                            stringResource(R.string.house_fixed_increase_no_source),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
