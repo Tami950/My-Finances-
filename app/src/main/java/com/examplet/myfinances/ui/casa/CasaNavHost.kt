@@ -11,9 +11,12 @@ private object CasaRoute {
     const val HOME = "casa/home"
     const val CREATE_PLAN = "casa/create-plan"
     const val EDIT = "casa/edit/{houseMonthId}/{mode}"
+    const val CLOSE_MONTH = "casa/close/{houseMonthId}"
 
     fun edit(houseMonthId: Long, mode: HousePlanEditMode): String =
         "casa/edit/$houseMonthId/${mode.name}"
+
+    fun closeMonth(houseMonthId: Long): String = "casa/close/$houseMonthId"
 }
 
 @Composable
@@ -32,6 +35,9 @@ fun CasaNavHost() {
                 },
                 onEditPositions = { houseMonthId ->
                     navController.navigate(CasaRoute.edit(houseMonthId, HousePlanEditMode.POSITIONS))
+                },
+                onCloseMonth = { houseMonthId ->
+                    navController.navigate(CasaRoute.closeMonth(houseMonthId))
                 }
             )
         }
@@ -51,6 +57,17 @@ fun CasaNavHost() {
             EditHousePlanScreen(
                 onBack = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = CasaRoute.CLOSE_MONTH,
+            arguments = listOf(
+                navArgument("houseMonthId") { type = NavType.LongType }
+            )
+        ) {
+            CloseHouseMonthScreen(
+                onBack = { navController.popBackStack() },
+                onClosed = { navController.popBackStack() }
             )
         }
     }
