@@ -1,5 +1,6 @@
 package com.examplet.myfinances.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -25,6 +26,8 @@ data class HouseMonthClosingEntity(
     val confirmedAvailableCents: Long,
     val availableAdjustmentCents: Long,
     val availableAdjustmentNote: String? = null,
+    @ColumnInfo(defaultValue = "0")
+    val unreconciledFixedExpenseDeficitCents: Long = 0,
     val createdAt: Long,
     val updatedAt: Long
 )
