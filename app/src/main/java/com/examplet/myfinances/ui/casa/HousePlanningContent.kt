@@ -66,37 +66,54 @@ internal fun HousePlanningContent(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (previousOpen != null) {
-                Text(
-                    stringResource(R.string.house_previous_month_must_close_title),
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    stringResource(
-                        R.string.house_previous_month_must_close_description,
-                        monthLabel(previousOpen.month, previousOpen.year),
-                        currentMonth
+            when {
+                previousOpen != null -> {
+                    Text(
+                        stringResource(R.string.house_previous_month_must_close_title),
+                        style = MaterialTheme.typography.headlineSmall
                     )
-                )
-                Spacer(Modifier.height(24.dp))
-                Button(onClick = { onCloseMonth(previousOpen.id) }) {
+                    Spacer(Modifier.height(12.dp))
                     Text(
                         stringResource(
-                            R.string.house_close_named_month,
-                            monthLabel(previousOpen.month, previousOpen.year)
+                            R.string.house_previous_month_must_close_description,
+                            monthLabel(previousOpen.month, previousOpen.year),
+                            currentMonth
                         )
                     )
+                    Spacer(Modifier.height(24.dp))
+                    Button(onClick = { onCloseMonth(previousOpen.id) }) {
+                        Text(
+                            stringResource(
+                                R.string.house_close_named_month,
+                                monthLabel(previousOpen.month, previousOpen.year)
+                            )
+                        )
+                    }
                 }
-            } else {
-                Text(
-                    stringResource(R.string.house_planning_empty_title, currentMonth),
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(stringResource(R.string.house_planning_empty_description))
-                Spacer(Modifier.height(24.dp))
-                Button(onClick = onCreatePlan) { Text(stringResource(R.string.house_plan_month)) }
+
+                !state.isPlanningReady -> {
+                    Text(
+                        stringResource(R.string.house_planning_not_ready_title),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(R.string.house_planning_not_ready_description))
+                    Spacer(Modifier.height(24.dp))
+                    Button(onClick = onConfigure) {
+                        Text(stringResource(R.string.house_setup_action))
+                    }
+                }
+
+                else -> {
+                    Text(
+                        stringResource(R.string.house_planning_empty_title, currentMonth),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(R.string.house_planning_empty_description))
+                    Spacer(Modifier.height(24.dp))
+                    Button(onClick = onCreatePlan) { Text(stringResource(R.string.house_plan_month)) }
+                }
             }
         }
         return
