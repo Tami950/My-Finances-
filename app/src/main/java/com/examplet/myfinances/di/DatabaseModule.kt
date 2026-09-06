@@ -2,6 +2,7 @@ package com.examplet.myfinances.di
 
 import android.content.Context
 import androidx.room.Room
+import com.examplet.myfinances.data.dao.FixedExpensePendingDao
 import com.examplet.myfinances.data.dao.HouseCategoryDao
 import com.examplet.myfinances.data.dao.HouseMonthAccountBalanceDao
 import com.examplet.myfinances.data.dao.HouseMonthClosingDao
@@ -10,6 +11,7 @@ import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.dao.MoneyAccountDao
 import com.examplet.myfinances.data.db.MIGRATION_5_6
 import com.examplet.myfinances.data.db.MIGRATION_6_7
+import com.examplet.myfinances.data.db.MIGRATION_7_8
 import com.examplet.myfinances.data.db.MyFinancesDatabase
 import dagger.Module
 import dagger.Provides
@@ -31,9 +33,7 @@ object DatabaseModule {
         MyFinancesDatabase::class.java,
         "my_finances.db"
     )
-        // Preserve current development data through the month-closing schema changes.
-        .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
-        // Still temporary for older unsupported development schemas.
+        .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
         .fallbackToDestructiveMigration()
         .build()
 
@@ -60,4 +60,8 @@ object DatabaseModule {
     @Provides
     fun provideHouseMonthClosingDao(database: MyFinancesDatabase): HouseMonthClosingDao =
         database.houseMonthClosingDao()
+
+    @Provides
+    fun provideFixedExpensePendingDao(database: MyFinancesDatabase): FixedExpensePendingDao =
+        database.fixedExpensePendingDao()
 }
