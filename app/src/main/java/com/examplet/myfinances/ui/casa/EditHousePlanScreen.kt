@@ -214,7 +214,7 @@ fun EditHousePlanScreen(
                 title = { Text(row.name, style = MaterialTheme.typography.titleLarge) },
                 actions = {
                     Button(
-                        onClick = viewModel::dismissCategory,
+                        onClick = viewModel::commitCategory,
                         enabled = row.categoryBehavior != HouseCategoryBehavior.FIXED_EXPENSE ||
                             (row.plannedFixedCents > 0 && row.fixedExpensePrefundedCents <= row.plannedFixedCents)
                     ) { Text(stringResource(R.string.action_done)) }
@@ -266,7 +266,7 @@ fun EditHousePlanScreen(
             AppModalBottomSheet(
                 onDismissRequest = viewModel::dismissAccount,
                 title = { Text(row.account.name, style = MaterialTheme.typography.titleLarge) },
-                actions = { Button(onClick = viewModel::dismissAccount) { Text(stringResource(R.string.action_done)) } }
+                actions = { Button(onClick = viewModel::commitAccount) { Text(stringResource(R.string.action_done)) } }
             ) {
                 OutlinedTextField(
                     value = row.amountText,
