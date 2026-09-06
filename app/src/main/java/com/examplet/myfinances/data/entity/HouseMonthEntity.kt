@@ -15,6 +15,7 @@ data class HouseMonthEntity(
     val year: Int,
     val month: Int,
     val totalResourcesCents: Long,
+    val openingAvailableCents: Long = 0,
     val note: String? = null,
     val status: HouseMonthStatus = HouseMonthStatus.OPEN,
     val closedAt: Long? = null,
