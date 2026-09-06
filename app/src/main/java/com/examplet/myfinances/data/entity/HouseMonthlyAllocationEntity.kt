@@ -38,6 +38,9 @@ data class HouseMonthlyAllocationEntity(
     @ColumnInfo(defaultValue = "'BUDGET'")
     val categoryBehavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
     val fixedExpensePaymentStatus: FixedExpensePaymentStatus? = null,
+    val fixedExpensePlannedCents: Long? = null,
+    @ColumnInfo(defaultValue = "0")
+    val fixedExpensePrefundedCents: Long = 0,
     val openingBalanceCents: Long = 0,
     val allocatedCents: Long = 0,
     val createdAt: Long,
