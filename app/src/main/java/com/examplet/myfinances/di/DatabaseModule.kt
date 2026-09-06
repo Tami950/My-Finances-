@@ -9,6 +9,7 @@ import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.dao.MoneyAccountDao
 import com.examplet.myfinances.data.db.MIGRATION_5_6
+import com.examplet.myfinances.data.db.MIGRATION_6_7
 import com.examplet.myfinances.data.db.MyFinancesDatabase
 import dagger.Module
 import dagger.Provides
@@ -30,8 +31,8 @@ object DatabaseModule {
         MyFinancesDatabase::class.java,
         "my_finances.db"
     )
-        // Preserve the current development data while introducing month closing.
-        .addMigrations(MIGRATION_5_6)
+        // Preserve current development data through the month-closing schema changes.
+        .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
         // Still temporary for older unsupported development schemas.
         .fallbackToDestructiveMigration()
         .build()
