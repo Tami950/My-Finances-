@@ -8,6 +8,7 @@ import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.db.MyFinancesDatabase
 import com.examplet.myfinances.data.entity.HouseMonthAccountBalanceEntity
+import com.examplet.myfinances.data.entity.HouseMonthAvailableClosingTransferEntity
 import com.examplet.myfinances.data.entity.HouseMonthCategoryClosingEntity
 import com.examplet.myfinances.data.entity.HouseMonthClosingEntity
 import com.examplet.myfinances.data.entity.HouseMonthClosingTransferEntity
@@ -101,24 +102,34 @@ class HousePlanRepositoryImpl @Inject constructor(
         if (previous.status != HouseMonthStatus.CLOSED) return HouseMonthCarryover()
 
         val closing = closingDao.getByMonthId(previous.id) ?: return HouseMonthCarryover()
-        val transfers = closingDao.getTransfers(previous.id)
+        val categoryTransfers = closingDao.getTransfers(previous.id)
+        val availableTransfers = closingDao.getAvailableTransfers(previous.id)
 
-        val categoryOpenings = transfers
-            .asSequence()
+        val categoryOpenings = mutableMapOf<Long, Long>()
+        categoryTransfers
             .filter {
                 it.destinationType == HouseClosingDestinationType.CATEGORY &&
                     it.destinationCategoryId != null
             }
-            .groupBy { requireNotNull(it.destinationCategoryId) }
-            .mapValues { (_, values) -> values.sumOf { it.amountCents } }
+            .forEach { transfer ->
+                val destinationId = requireNotNull(transfer.destinationCategoryId)
+                categoryOpenings[destinationId] =
+                    categoryOpenings.getOrDefault(destinationId, 0) + transfer.amountCents
+            }
+        availableTransfers.forEach { transfer ->
+            categoryOpenings[transfer.destinationCategoryId] =
+                categoryOpenings.getOrDefault(transfer.destinationCategoryId, 0) + transfer.amountCents
+        }
 
-        val transferredToAvailable = transfers
+        val transferredToAvailable = categoryTransfers
             .filter { it.destinationType == HouseClosingDestinationType.AVAILABLE }
             .sumOf { it.amountCents }
+        val transferredFromAvailable = availableTransfers.sumOf { it.amountCents }
 
         return HouseMonthCarryover(
             categoryOpeningCents = categoryOpenings,
-            availableCents = closing.confirmedAvailableCents + transferredToAvailable
+            availableCents =
+                closing.confirmedAvailableCents - transferredFromAvailable + transferredToAvailable
         )
     }
 
@@ -293,6 +304,25 @@ class HousePlanRepositoryImpl @Inject constructor(
                 "Il Disponibile confermato non può essere negativo"
             }
 
+            require(draft.availableTransfers.all { it.amountCents >= 0 }) {
+                "Gli importi spostati dal Disponibile non possono essere negativi"
+            }
+            val positiveAvailableTransfers = draft.availableTransfers.filter { it.amountCents > 0 }
+            require(
+                positiveAvailableTransfers.map { it.destinationCategoryId }.distinct().size ==
+                    positiveAvailableTransfers.size
+            ) {
+                "La stessa categoria non può ricevere due trasferimenti dal Disponibile"
+            }
+            positiveAvailableTransfers.forEach { transfer ->
+                require(transfer.destinationCategoryId in activeCategoryIds) {
+                    "La categoria di destinazione del Disponibile deve essere attiva"
+                }
+            }
+            require(positiveAvailableTransfers.sumOf { it.amountCents } <= draft.confirmedAvailableCents) {
+                "Non puoi spostare più del Disponibile confermato"
+            }
+
             val now = System.currentTimeMillis()
             closingDao.insertMonthClosing(
                 HouseMonthClosingEntity(
@@ -305,6 +335,19 @@ class HousePlanRepositoryImpl @Inject constructor(
                     updatedAt = now
                 )
             )
+
+            if (positiveAvailableTransfers.isNotEmpty()) {
+                closingDao.insertAvailableTransfers(
+                    positiveAvailableTransfers.map { transfer ->
+                        HouseMonthAvailableClosingTransferEntity(
+                            houseMonthId = month.id,
+                            destinationCategoryId = transfer.destinationCategoryId,
+                            amountCents = transfer.amountCents,
+                            createdAt = now
+                        )
+                    }
+                )
+            }
 
             val transferEntities = mutableListOf<HouseMonthClosingTransferEntity>()
 
