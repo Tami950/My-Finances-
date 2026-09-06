@@ -7,32 +7,32 @@ I file Markdown sono la sorgente canonica dei documenti principali. Le versioni 
 ## Documenti correnti
 
 - [Specifiche generali - v4](./MyFinances_Specifiche_Progetto_v4.md) - Obiettivi, sezioni, regole di dominio, Casa/Pianificazione, Dashboard, Analisi futura, architettura e roadmap.
-- [Schema Room Casa - v2](./MyFinances_Schema_Room_Casa_v2.md) - Tabelle correnti, modello di chiusura, invarianti, movimenti e requisiti di preservazione storica.
+- [Schema Room Casa - v2](./MyFinances_Schema_Room_Casa_v2.md) - Schema Room v9, chiusura, prefunding, pendenti, carryover e invarianti.
 - [Flussi UX, stati ed edge case - v1](./MyFinances_Flussi_UX_Edge_Case_v1.md) - Responsabilita' delle schermate, flussi operativi, chiusura mese, casi limite e piano per completare Casa.
-- [Spese fisse Casa - v1](./MyFinances_Spese_Fisse_Casa_v1.md) - Comportamento FIXED_EXPENSE, stato pagata/non pagata, riconciliazione in chiusura, deficit/surplus e spese pendenti.
+- [Spese fisse Casa - v1](./MyFinances_Spese_Fisse_Casa_v1.md) - Specifica canonica della feature FIXED_EXPENSE: importi abituali, prefunding, riconciliazione, pendenti e regole UX dei bottom sheet.
 
-## Decisioni aggiunte nell'ultimo aggiornamento
+## Decisioni correnti rilevanti
 
-- `Disponibile` e' liquidita' Casa non vincolata, non denaro che deve necessariamente essere allocato.
-- La chiusura distingue sempre saldo calcolato e saldo finale confermato dall'utente.
-- Il saldo confermato resta sempre correggibile manualmente anche dopo l'introduzione dei movimenti.
-- Le discrepanze non vengono nascoste: si conserva una rettifica di chiusura e, opzionalmente, una nota.
-- Ogni residuo confermato di una categoria BUDGET deve essere distribuito completamente tra stessa categoria, altre categorie e/o Disponibile del mese successivo.
-- Il valore `Mantieni` e' derivato automaticamente: se cambia il saldo reale o se vengono inserite altre destinazioni, l'app ricalcola il residuo senza richiedere conti manuali.
-- Il Disponibile puo' restare libero oppure essere riallocato verso categorie; la parte non spostata resta Disponibile per default.
-- Le categorie possono avere comportamento `BUDGET` o `FIXED_EXPENSE`. In UI `FIXED_EXPENSE` viene esposto con la checkbox `Spesa fissa`; default false/BUDGET per categorie esistenti e nuove.
-- Una spesa fissa e' denaro impegnato nella pianificazione e non richiede movimenti ordinari. Puo' essere segnata Pagata o Da pagare.
-- In chiusura una spesa fissa confronta importo pianificato e reale. Un importo liberato va al Disponibile per default ma puo' essere riallocato; un extra riduce automaticamente il Disponibile.
-- Se l'extra di una spesa fissa supera il Disponibile, la chiusura non viene bloccata definitivamente: viene mostrato un warning e la parte non coperta viene conservata come discrepanza esplicita.
-- Una spesa fissa ancora non pagata deve essere riconciliata come pagata, ancora pendente oppure non piu' dovuta.
-- Una spesa pendente passa al mese successivo come obbligo gia' finanziato, con categoria, mese di origine e nota opzionale. Non diventa opening e non viene riallocata di nuovo.
-- Le spese fisse restano concettualmente separate dalla sezione Bollette: Bollette riguarda scadenze/promemoria, Casa riguarda il comportamento finanziario nella pianificazione.
-- I Fondi Casa separati sono esclusi per ora: non e' stata identificata una semantica sufficientemente diversa da una normale categoria.
-- Gli opening del mese successivo derivano dalle distribuzioni della chiusura precedente e restano modificabili.
-- Dopo chiusura + autocompletamento si implementano navigazione mesi, movimenti categorie/Disponibile, movimenti posizioni e infine le rifiniture Personalizzazione.
-- `Analisi & Suggerimenti` e' ora un requisito mandatorio futuro, non una feature opzionale.
-- Prima di considerare definitivamente chiusa Casa, verra' eseguito un audit dello schema e di tutti i flussi per verificare che vengano conservati i dati grezzi necessari a indicatori e suggerimenti futuri.
-- Principio per l'analisi: dato grezzo -> indicatore derivato -> suggerimento. Allocazioni, movimenti, rettifiche, stato delle spese fisse, pendenti e distribuzioni non devono essere sovrascritti o persi se possono avere valore storico.
+- `Disponibile` e' liquidita' Casa non vincolata e non una categoria fittizia.
+- La chiusura conserva sempre saldo calcolato, saldo reale confermato e relative rettifiche senza riscrivere la storia.
+- Per una categoria `BUDGET`, se non vengono indicate destinazioni esplicite tutto il residuo resta nella stessa categoria; `Mantieni` e' derivato automaticamente dal saldo reale e dalle destinazioni inserite.
+- Il Disponibile resta Disponibile per default e puo' essere redistribuito. Nel suo bottom sheet `Mantieni Disponibile` e' mostrato subito dopo il saldo reale e si aggiorna live.
+- Le categorie usano `HouseCategoryBehavior.BUDGET` o `FIXED_EXPENSE`; in UI la scelta e' una semplice checkbox `Spesa fissa`, disattivata per default.
+- Una `FIXED_EXPENSE` non usa Libera/Obiettivo: possiede un importo mensile abituale, proposto automaticamente nei nuovi mesi e sempre modificabile nel singolo mese.
+- Il planner puo' usare `Nuove risorse Casa abituali` salvate in Personalizzazione. Il Disponibile ereditato resta separato e nel primo mese senza precedente parte da 0.
+- Una spesa fissa distingue `planned`, `prefunded` e quota da nuove risorse. Il prefunding non e' opening e non puo' superare l'importo previsto.
+- In chiusura una FIXED_EXPENSE puo' ricevere denaro come prefunding del mese successivo. Il limite viene controllato sulla somma di tutte le sorgenti del wizard.
+- Cambiando l'importo di una spesa fissa nel planner, il flag `Usa questo importo come nuovo valore abituale` e' opt-in e richiede conferma prima di modificare il default globale.
+- Cambiando l'importo abituale da Personalizzazione, l'utente sceglie se applicarlo dal prossimo mese o anche al mese OPEN corrente. Il riallineamento corrente richiede una sorgente/destinazione esplicita tra Disponibile e categorie BUDGET valide.
+- Una spesa fissa puo' essere `Pagata` o `Da pagare`; lo stato operativo non modifica il budget gia' vincolato.
+- In chiusura una spesa fissa non pagata deve essere risolta come pagata, ancora pendente o non piu' dovuta. Una pendente passa al mese successivo come obbligo gia' finanziato, non come opening o Disponibile.
+- Un deficit fixed consuma automaticamente il Disponibile. Se non basta, la parte scoperta viene conservata come discrepanza e richiede conferma, senza bloccare definitivamente la chiusura.
+- I Fondi Casa complessivi includono nuove risorse, Disponibile ereditato, opening BUDGET, prefunding FIXED_EXPENSE e pendenti ancora finanziate.
+- I bottom sheet dell'app non si chiudono con tap sullo sfondo o swipe: hanno una X esplicita. X annulla il draft del foglio; Fatto/Salva/Conferma applica solo modifiche valide.
+- Le spese fisse restano separate dalla sezione Bollette: Bollette riguarda scadenze/promemoria, Casa il comportamento finanziario nella pianificazione.
+- I Fondi Casa separati sono esclusi per ora.
+- Dopo chiusura + autocompletamento si implementano navigazione mesi, movimenti categorie/Disponibile, movimenti posizioni e poi le rifiniture Personalizzazione.
+- `Analisi & Suggerimenti` e' un requisito mandatorio futuro. Prima di considerare Casa stabile verra' eseguito un audit dello schema e dei dati grezzi preservati.
 
 ## Regola di manutenzione
 
