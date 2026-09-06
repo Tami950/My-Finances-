@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -113,10 +114,36 @@ fun CloseHouseMonthScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                        ClosingValueRow(
+                            stringResource(R.string.house_closing_to_categories),
+                            state.availableDistributedToCategoriesCents ?: 0
+                        )
+                        ClosingValueRow(
+                            stringResource(R.string.house_closing_keep_available),
+                            state.availableKeptCents ?: 0
+                        )
+                        state.availableOverDistributedCents
+                            ?.takeIf { it > 0 }
+                            ?.let { overflow ->
+                                Text(
+                                    stringResource(
+                                        R.string.house_closing_over_distributed,
+                                        formatHouseCents(overflow)
+                                    ),
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         Text(
                             stringResource(R.string.house_closing_available_rollover_help),
                             style = MaterialTheme.typography.bodySmall
                         )
+                        OutlinedButton(
+                            onClick = viewModel::openAvailableDistribution,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.house_closing_manage_available))
+                        }
                     }
                 }
 
@@ -124,6 +151,10 @@ fun CloseHouseMonthScreen(
                     Text(
                         stringResource(R.string.house_closing_categories_title),
                         style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        stringResource(R.string.house_closing_default_keep_help),
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
 
@@ -151,34 +182,21 @@ fun CloseHouseMonthScreen(
                         )
                         ClosingValueRow(
                             stringResource(R.string.house_closing_distributed),
-                            row.distributedCents ?: 0
+                            row.explicitlyDistributedCents ?: 0
                         )
+                        if (row.canKeepInSource) {
+                            ClosingValueRow(
+                                stringResource(
+                                    R.string.house_closing_keep_in_category,
+                                    row.categoryName
+                                ),
+                                row.keepInSourceCents ?: 0
+                            )
+                        }
                         row.adjustmentCents?.takeIf { it != 0L }?.let { adjustment ->
                             ClosingAdjustment(adjustment)
                         }
-                        val remaining = row.remainingCents
-                        if (remaining != null && remaining != 0L) {
-                            Text(
-                                text = if (remaining > 0) {
-                                    stringResource(
-                                        R.string.house_closing_still_to_distribute,
-                                        formatHouseCents(remaining)
-                                    )
-                                } else {
-                                    stringResource(
-                                        R.string.house_closing_over_distributed,
-                                        formatHouseCents(-remaining)
-                                    )
-                                },
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        } else if (row.isValid) {
-                            Text(
-                                stringResource(R.string.house_closing_distribution_ok),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
+                        ClosingDistributionStatus(row)
                     }
                 }
 
@@ -203,6 +221,59 @@ fun CloseHouseMonthScreen(
                     }
                 }
             }
+        }
+    }
+
+    if (state.showAvailableDistribution) {
+        AppModalBottomSheet(
+            onDismissRequest = viewModel::dismissAvailableDistribution,
+            title = {
+                Text(
+                    stringResource(R.string.house_summary_unallocated),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            actions = {
+                Button(onClick = viewModel::dismissAvailableDistribution) {
+                    Text(stringResource(R.string.action_done))
+                }
+            }
+        ) {
+            Text(
+                stringResource(R.string.house_closing_available_destinations_help),
+                style = MaterialTheme.typography.bodySmall
+            )
+            ClosingValueRow(
+                stringResource(R.string.house_closing_confirmed_balance),
+                state.confirmedAvailableCents ?: 0
+            )
+            state.availableDestinations.forEach { destination ->
+                OutlinedTextField(
+                    value = destination.amountText,
+                    onValueChange = {
+                        viewModel.updateAvailableDestinationAmount(destination.categoryId, it)
+                    },
+                    label = { Text(destination.label) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            ClosingValueRow(
+                stringResource(R.string.house_closing_keep_available),
+                state.availableKeptCents ?: 0
+            )
+            state.availableOverDistributedCents
+                ?.takeIf { it > 0 }
+                ?.let { overflow ->
+                    Text(
+                        stringResource(
+                            R.string.house_closing_over_distributed,
+                            formatHouseCents(overflow)
+                        ),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
         }
     }
 
@@ -248,17 +319,28 @@ fun CloseHouseMonthScreen(
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                stringResource(R.string.house_closing_destinations_help),
+                if (row.canKeepInSource) {
+                    stringResource(R.string.house_closing_default_keep_help)
+                } else {
+                    stringResource(R.string.house_closing_destinations_help)
+                },
                 style = MaterialTheme.typography.bodySmall
             )
+
+            if (row.canKeepInSource) {
+                ClosingValueRow(
+                    stringResource(
+                        R.string.house_closing_keep_in_category,
+                        row.categoryName
+                    ),
+                    row.keepInSourceCents ?: 0
+                )
+            }
 
             row.destinations.forEach { destination ->
                 val destinationLabel = when {
                     destination.type == HouseClosingDestinationType.AVAILABLE ->
                         stringResource(R.string.house_summary_unallocated)
-
-                    destination.categoryId == row.categoryId ->
-                        stringResource(R.string.house_closing_keep_in_category, destination.label)
 
                     else -> destination.label
                 }
@@ -279,31 +361,7 @@ fun CloseHouseMonthScreen(
                 )
             }
 
-            val remaining = row.remainingCents
-            when {
-                remaining == null -> Text(
-                    stringResource(R.string.house_closing_invalid_amount),
-                    color = MaterialTheme.colorScheme.error
-                )
-
-                remaining > 0 -> Text(
-                    stringResource(
-                        R.string.house_closing_still_to_distribute,
-                        formatHouseCents(remaining)
-                    ),
-                    color = MaterialTheme.colorScheme.error
-                )
-
-                remaining < 0 -> Text(
-                    stringResource(
-                        R.string.house_closing_over_distributed,
-                        formatHouseCents(-remaining)
-                    ),
-                    color = MaterialTheme.colorScheme.error
-                )
-
-                else -> Text(stringResource(R.string.house_closing_distribution_ok))
-            }
+            ClosingDistributionStatus(row)
         }
     }
 
@@ -339,6 +397,42 @@ fun CloseHouseMonthScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ClosingDistributionStatus(row: HouseCategoryClosingUi) {
+    val overDistributed = row.overDistributedCents
+    val remaining = row.remainingCents
+    when {
+        row.confirmedBalanceCents == null || row.explicitlyDistributedCents == null -> Text(
+            stringResource(R.string.house_closing_invalid_amount),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        overDistributed != null && overDistributed > 0 -> Text(
+            stringResource(
+                R.string.house_closing_over_distributed,
+                formatHouseCents(overDistributed)
+            ),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        !row.canKeepInSource && remaining != null && remaining > 0 -> Text(
+            stringResource(
+                R.string.house_closing_still_to_distribute,
+                formatHouseCents(remaining)
+            ),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        row.isValid -> Text(
+            stringResource(R.string.house_closing_distribution_ok),
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 
