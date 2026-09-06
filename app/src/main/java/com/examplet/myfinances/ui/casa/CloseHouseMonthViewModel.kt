@@ -28,12 +28,16 @@ data class HouseClosingDestinationUi(
     val type: HouseClosingDestinationType,
     val categoryId: Long? = null,
     val label: String,
+    val categoryBehavior: HouseCategoryBehavior? = null,
+    val fixedExpenseDefaultCents: Long? = null,
     val amountText: String = ""
 )
 
 data class HouseAvailableClosingDestinationUi(
     val categoryId: Long,
     val label: String,
+    val categoryBehavior: HouseCategoryBehavior,
+    val fixedExpenseDefaultCents: Long? = null,
     val amountText: String = ""
 )
 
@@ -192,9 +196,68 @@ data class CloseHouseMonthUiState(
             return distributed <= confirmed
         }
 
+    val fixedDestinationIncomingCents: Map<Long, Long>
+        get() {
+            val result = mutableMapOf<Long, Long>()
+            availableDestinations.forEach { destination ->
+                if (destination.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                    val amount = parseClosingCentsOrNull(destination.amountText, allowBlank = true) ?: return@forEach
+                    result[destination.categoryId] = result.getOrDefault(destination.categoryId, 0L) + amount
+                }
+            }
+            categories.forEach { row ->
+                row.destinations.forEach { destination ->
+                    val id = destination.categoryId ?: return@forEach
+                    if (destination.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                        val amount = parseClosingCentsOrNull(destination.amountText, allowBlank = true) ?: return@forEach
+                        result[id] = result.getOrDefault(id, 0L) + amount
+                    }
+                }
+            }
+            return result
+        }
+
+    val fixedDestinationLimits: Map<Long, Long>
+        get() {
+            val result = mutableMapOf<Long, Long>()
+            availableDestinations.forEach {
+                if (it.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE && it.fixedExpenseDefaultCents != null) {
+                    result[it.categoryId] = it.fixedExpenseDefaultCents
+                }
+            }
+            categories.flatMap { it.destinations }.forEach {
+                val id = it.categoryId
+                if (id != null && it.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE && it.fixedExpenseDefaultCents != null) {
+                    result[id] = it.fixedExpenseDefaultCents
+                }
+            }
+            return result
+        }
+
+    val fixedDestinationOverflowCents: Map<Long, Long>
+        get() = fixedDestinationIncomingCents.mapNotNull { (id, incoming) ->
+            val limit = fixedDestinationLimits[id] ?: return@mapNotNull null
+            val overflow = incoming - limit
+            if (overflow > 0) id to overflow else null
+        }.toMap()
+
+    val fixedDestinationCapacityIsValid: Boolean
+        get() = fixedDestinationOverflowCents.isEmpty()
+
+    val availableSheetIsValid: Boolean
+        get() = availableIsValid && fixedDestinationCapacityIsValid
+
+    fun categorySheetIsValid(categoryId: Long): Boolean {
+        val row = categories.firstOrNull { it.categoryId == categoryId } ?: return false
+        return row.isValid && fixedDestinationCapacityIsValid
+    }
+
+    fun fixedDestinationOverflow(categoryId: Long?): Long =
+        if (categoryId == null) 0 else fixedDestinationOverflowCents[categoryId] ?: 0
+
     val canClose: Boolean
         get() = !isLoading && !isClosing && status == HouseMonthStatus.OPEN &&
-            availableIsValid && categories.all { it.isValid }
+            availableIsValid && fixedDestinationCapacityIsValid && categories.all { it.isValid }
 }
 
 @HiltViewModel
@@ -206,6 +269,9 @@ class CloseHouseMonthViewModel @Inject constructor(
     private val houseMonthId: Long = requireNotNull(savedStateHandle["houseMonthId"])
     private val _uiState = MutableStateFlow(CloseHouseMonthUiState(houseMonthId = houseMonthId))
     val uiState: StateFlow<CloseHouseMonthUiState> = _uiState.asStateFlow()
+
+    private var availableSheetOriginal: List<HouseAvailableClosingDestinationUi>? = null
+    private var categorySheetOriginal: HouseCategoryClosingUi? = null
 
     init {
         viewModelScope.launch {
@@ -238,7 +304,12 @@ class CloseHouseMonthViewModel @Inject constructor(
                         baseAvailableCents = initialBaseAvailable,
                         confirmedAvailableText = formatCentsForInput(initialCalculatedAvailable),
                         availableDestinations = activeCategories.map { category ->
-                            HouseAvailableClosingDestinationUi(category.id, category.name)
+                            HouseAvailableClosingDestinationUi(
+                                categoryId = category.id,
+                                label = category.name,
+                                categoryBehavior = category.behavior,
+                                fixedExpenseDefaultCents = category.fixedExpenseDefaultCents
+                            )
                         },
                         categories = closingCategories,
                         isLoading = false,
@@ -261,11 +332,25 @@ class CloseHouseMonthViewModel @Inject constructor(
     }
 
     fun openAvailableDistribution() {
+        if (_uiState.value.showAvailableDistribution) return
+        availableSheetOriginal = _uiState.value.availableDestinations
         _uiState.value = _uiState.value.copy(showAvailableDistribution = true, errorMessage = null)
     }
 
     fun dismissAvailableDistribution() {
-        _uiState.value = _uiState.value.copy(showAvailableDistribution = false)
+        val original = availableSheetOriginal
+        _uiState.value = _uiState.value.copy(
+            availableDestinations = original ?: _uiState.value.availableDestinations,
+            showAvailableDistribution = false,
+            errorMessage = null
+        )
+        availableSheetOriginal = null
+    }
+
+    fun commitAvailableDistribution() {
+        if (!_uiState.value.availableSheetIsValid) return
+        availableSheetOriginal = null
+        _uiState.value = _uiState.value.copy(showAvailableDistribution = false, errorMessage = null)
     }
 
     fun updateAvailableDestinationAmount(categoryId: Long, value: String) {
@@ -278,11 +363,27 @@ class CloseHouseMonthViewModel @Inject constructor(
     }
 
     fun openCategory(categoryId: Long) {
+        if (_uiState.value.selectedCategoryId != null) return
+        categorySheetOriginal = _uiState.value.categories.firstOrNull { it.categoryId == categoryId }
         _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId, errorMessage = null)
     }
 
     fun dismissCategory() {
-        _uiState.value = _uiState.value.copy(selectedCategoryId = null)
+        val original = categorySheetOriginal
+        if (original != null) {
+            val restored = _uiState.value.categories.map { if (it.categoryId == original.categoryId) original else it }
+            applyCategoryUpdate(restored, selectedCategoryId = null)
+        } else {
+            _uiState.value = _uiState.value.copy(selectedCategoryId = null)
+        }
+        categorySheetOriginal = null
+    }
+
+    fun commitCategory() {
+        val id = _uiState.value.selectedCategoryId ?: return
+        if (!_uiState.value.categorySheetIsValid(id)) return
+        categorySheetOriginal = null
+        _uiState.value = _uiState.value.copy(selectedCategoryId = null, errorMessage = null)
     }
 
     fun updateConfirmedBalance(categoryId: Long, value: String) {
@@ -309,10 +410,7 @@ class CloseHouseMonthViewModel @Inject constructor(
                     formatCentsForInput(row.calculatedBalanceCents)
                 else -> row.confirmedBalanceText
             }
-            row.copy(
-                fixedExpenseClosingAction = action,
-                confirmedBalanceText = restoredActual
-            )
+            row.copy(fixedExpenseClosingAction = action, confirmedBalanceText = restoredActual)
         }
         applyCategoryUpdate(updated)
     }
@@ -344,13 +442,17 @@ class CloseHouseMonthViewModel @Inject constructor(
         applyCategoryUpdate(updated)
     }
 
-    private fun applyCategoryUpdate(categories: List<HouseCategoryClosingUi>) {
+    private fun applyCategoryUpdate(
+        categories: List<HouseCategoryClosingUi>,
+        selectedCategoryId: Long? = _uiState.value.selectedCategoryId
+    ) {
         val current = _uiState.value
         val newCalculatedAvailable = (
             current.baseAvailableCents - categories.sumOf { it.fixedExpenseDeficitCents ?: 0 }
         ).coerceAtLeast(0)
         _uiState.value = current.copy(
             categories = categories,
+            selectedCategoryId = selectedCategoryId,
             confirmedAvailableText = if (current.availableManuallyEdited) {
                 current.confirmedAvailableText
             } else formatCentsForInput(newCalculatedAvailable),
@@ -401,7 +503,6 @@ class CloseHouseMonthViewModel @Inject constructor(
                                 )
                             }
                         }
-
                         HouseCategoryBehavior.FIXED_EXPENSE -> {
                             val keepAvailable = requireNotNull(row.fixedExpenseKeepAvailableCents)
                             if (keepAvailable > 0) {
@@ -433,8 +534,7 @@ class CloseHouseMonthViewModel @Inject constructor(
                         availableAdjustmentNote = state.availableAdjustmentNote,
                         availableTransfers = availableTransfers,
                         categories = categoryDrafts,
-                        confirmUnreconciledFixedExpenseDeficit =
-                            state.unreconciledFixedExpenseDeficitCents > 0
+                        confirmUnreconciledFixedExpenseDeficit = state.unreconciledFixedExpenseDeficitCents > 0
                     )
                 )
             }.onSuccess {
@@ -465,7 +565,9 @@ class CloseHouseMonthViewModel @Inject constructor(
                 HouseClosingDestinationUi(
                     type = HouseClosingDestinationType.CATEGORY,
                     categoryId = category.id,
-                    label = category.name
+                    label = category.name,
+                    categoryBehavior = category.behavior,
+                    fixedExpenseDefaultCents = category.fixedExpenseDefaultCents
                 )
             }
 
@@ -474,14 +576,10 @@ class CloseHouseMonthViewModel @Inject constructor(
                 val availableDestination = HouseClosingDestinationUi(
                     type = HouseClosingDestinationType.AVAILABLE,
                     categoryId = null,
-                    label = "Disponibile",
-                    amountText = if (!sourceIsActive && allocation.totalAvailableCents > 0) {
-                        formatCentsForInput(allocation.totalAvailableCents)
-                    } else ""
+                    label = "Disponibile"
                 )
                 categoryDestinations + availableDestination
             }
-
             HouseCategoryBehavior.FIXED_EXPENSE -> categoryDestinations
         }
 
