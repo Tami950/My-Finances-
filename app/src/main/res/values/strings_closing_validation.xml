@@ -1,0 +1,4 @@
+<resources>
+    <string name="house_closing_fixed_destination_global_error">Una o più spese fisse ricevono più del loro importo abituale. Correggi la distribuzione prima di continuare.</string>
+    <string name="house_closing_fixed_destination_overflow">Questa spesa fissa riceve complessivamente %1$s in più del suo importo abituale.</string>
+</resources>
