@@ -79,3 +79,27 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         )
     }
 }
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `house_month_available_closing_transfers` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `houseMonthId` INTEGER NOT NULL,
+                `destinationCategoryId` INTEGER NOT NULL,
+                `amountCents` INTEGER NOT NULL,
+                `createdAt` INTEGER NOT NULL,
+                FOREIGN KEY(`houseMonthId`) REFERENCES `house_months`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY(`destinationCategoryId`) REFERENCES `house_categories`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_house_month_available_closing_transfers_houseMonthId_destinationCategoryId` ON `house_month_available_closing_transfers` (`houseMonthId`, `destinationCategoryId`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_house_month_available_closing_transfers_destinationCategoryId` ON `house_month_available_closing_transfers` (`destinationCategoryId`)"
+        )
+    }
+}
