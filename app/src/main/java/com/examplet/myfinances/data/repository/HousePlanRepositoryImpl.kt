@@ -1,13 +1,21 @@
 package com.examplet.myfinances.data.repository
 
 import androidx.room.withTransaction
+import com.examplet.myfinances.data.dao.HouseCategoryDao
 import com.examplet.myfinances.data.dao.HouseMonthAccountBalanceDao
+import com.examplet.myfinances.data.dao.HouseMonthClosingDao
 import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.db.MyFinancesDatabase
 import com.examplet.myfinances.data.entity.HouseMonthAccountBalanceEntity
+import com.examplet.myfinances.data.entity.HouseMonthCategoryClosingEntity
+import com.examplet.myfinances.data.entity.HouseMonthClosingEntity
+import com.examplet.myfinances.data.entity.HouseMonthClosingTransferEntity
 import com.examplet.myfinances.data.entity.HouseMonthEntity
 import com.examplet.myfinances.data.entity.HouseMonthlyAllocationEntity
+import com.examplet.myfinances.domain.model.HouseClosingDestinationType
+import com.examplet.myfinances.domain.model.HouseMonthCarryover
+import com.examplet.myfinances.domain.model.HouseMonthClosingDraft
 import com.examplet.myfinances.domain.model.HouseMonthStatus
 import com.examplet.myfinances.domain.model.HousePlanAccountBalance
 import com.examplet.myfinances.domain.model.HousePlanAccountBalanceDraft
@@ -25,7 +33,9 @@ class HousePlanRepositoryImpl @Inject constructor(
     private val database: MyFinancesDatabase,
     private val houseMonthDao: HouseMonthDao,
     private val allocationDao: HouseMonthlyAllocationDao,
-    private val accountBalanceDao: HouseMonthAccountBalanceDao
+    private val accountBalanceDao: HouseMonthAccountBalanceDao,
+    private val categoryDao: HouseCategoryDao,
+    private val closingDao: HouseMonthClosingDao
 ) : HousePlanRepository {
 
     override fun observeSummary(year: Int, month: Int): Flow<HousePlanSummary?> =
@@ -36,6 +46,8 @@ class HousePlanRepositoryImpl @Inject constructor(
                     year = it.year,
                     month = it.month,
                     totalResourcesCents = it.totalResourcesCents,
+                    openingAvailableCents = it.openingAvailableCents,
+                    openingBalanceCents = it.openingBalanceCents,
                     allocatedCents = it.allocatedCents,
                     positionedCents = it.positionedCents,
                     status = it.status
@@ -54,6 +66,7 @@ class HousePlanRepositoryImpl @Inject constructor(
                 year = it.year,
                 month = it.month,
                 totalResourcesCents = it.totalResourcesCents,
+                openingAvailableCents = it.openingAvailableCents,
                 note = it.note,
                 status = it.status,
                 closedAt = it.closedAt,
@@ -81,6 +94,34 @@ class HousePlanRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getCarryoverFor(year: Int, month: Int): HouseMonthCarryover {
+        val (previousYear, previousMonth) = previousMonthOf(year, month)
+        val previous = houseMonthDao.getByYearMonth(previousYear, previousMonth)
+            ?: return HouseMonthCarryover()
+        if (previous.status != HouseMonthStatus.CLOSED) return HouseMonthCarryover()
+
+        val closing = closingDao.getByMonthId(previous.id) ?: return HouseMonthCarryover()
+        val transfers = closingDao.getTransfers(previous.id)
+
+        val categoryOpenings = transfers
+            .asSequence()
+            .filter {
+                it.destinationType == HouseClosingDestinationType.CATEGORY &&
+                    it.destinationCategoryId != null
+            }
+            .groupBy { requireNotNull(it.destinationCategoryId) }
+            .mapValues { (_, values) -> values.sumOf { it.amountCents } }
+
+        val transferredToAvailable = transfers
+            .filter { it.destinationType == HouseClosingDestinationType.AVAILABLE }
+            .sumOf { it.amountCents }
+
+        return HouseMonthCarryover(
+            categoryOpeningCents = categoryOpenings,
+            availableCents = closing.confirmedAvailableCents + transferredToAvailable
+        )
+    }
+
     override suspend fun createPlan(draft: HousePlanDraft): Long {
         validateDraft(draft)
 
@@ -93,6 +134,7 @@ class HousePlanRepositoryImpl @Inject constructor(
                     year = draft.year,
                     month = draft.month,
                     totalResourcesCents = draft.totalResourcesCents,
+                    openingAvailableCents = draft.openingAvailableCents,
                     note = normalizedNote(draft.note),
                     status = HouseMonthStatus.OPEN,
                     closedAt = null,
@@ -140,14 +182,16 @@ class HousePlanRepositoryImpl @Inject constructor(
             val currentPositioned = accountBalanceDao
                 .getForMonth(houseMonthId)
                 .sumOf { it.amountCents }
-            require(currentPositioned <= draft.totalResourcesCents) {
-                "Le posizioni attuali superano le nuove risorse del mese"
+            val newTotalHouseFunds = totalHouseFundsCents(draft)
+            require(currentPositioned <= newTotalHouseFunds) {
+                "Le posizioni attuali superano i fondi Casa risultanti"
             }
 
             val now = System.currentTimeMillis()
             houseMonthDao.update(
                 month.copy(
                     totalResourcesCents = draft.totalResourcesCents,
+                    openingAvailableCents = draft.openingAvailableCents,
                     note = normalizedNote(draft.note),
                     updatedAt = now
                 )
@@ -181,9 +225,14 @@ class HousePlanRepositoryImpl @Inject constructor(
 
         database.withTransaction {
             val month = requireOpenMonth(houseMonthId)
+            val openingCategories = allocationDao
+                .getForMonth(houseMonthId)
+                .sumOf { it.openingBalanceCents }
+            val totalHouseFunds =
+                month.totalResourcesCents + month.openingAvailableCents + openingCategories
             val positioned = accountBalances.sumOf { it.amountCents }
-            require(positioned <= month.totalResourcesCents) {
-                "Le posizioni del denaro superano le risorse del mese"
+            require(positioned <= totalHouseFunds) {
+                "Le posizioni del denaro superano i fondi Casa complessivi"
             }
 
             val now = System.currentTimeMillis()
@@ -222,6 +271,126 @@ class HousePlanRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun closeMonth(draft: HouseMonthClosingDraft) {
+        database.withTransaction {
+            val month = requireOpenMonth(draft.houseMonthId)
+            require(closingDao.getByMonthId(month.id) == null) {
+                "Il mese possiede già una chiusura"
+            }
+
+            val allocations = allocationDao.getForMonth(month.id)
+            val allocationByCategory = allocations.associateBy { it.categoryId }
+            require(draft.categories.map { it.categoryId }.toSet() == allocationByCategory.keys) {
+                "La chiusura deve includere tutte le categorie del mese"
+            }
+
+            val activeCategoryIds = categoryDao.getActiveCategories().map { it.id }.toSet()
+            val allocatedCents = allocations.sumOf { it.allocatedCents }
+            val calculatedAvailable =
+                month.openingAvailableCents + month.totalResourcesCents - allocatedCents
+            require(calculatedAvailable >= 0) { "Il Disponibile calcolato non può essere negativo" }
+            require(draft.confirmedAvailableCents >= 0) {
+                "Il Disponibile confermato non può essere negativo"
+            }
+
+            val now = System.currentTimeMillis()
+            closingDao.insertMonthClosing(
+                HouseMonthClosingEntity(
+                    houseMonthId = month.id,
+                    calculatedAvailableCents = calculatedAvailable,
+                    confirmedAvailableCents = draft.confirmedAvailableCents,
+                    availableAdjustmentCents = draft.confirmedAvailableCents - calculatedAvailable,
+                    availableAdjustmentNote = normalizedNote(draft.availableAdjustmentNote),
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+
+            val transferEntities = mutableListOf<HouseMonthClosingTransferEntity>()
+
+            draft.categories.forEach { categoryDraft ->
+                val allocation = requireNotNull(allocationByCategory[categoryDraft.categoryId]) {
+                    "Categoria della chiusura non trovata"
+                }
+                val calculatedBalance =
+                    allocation.openingBalanceCents + allocation.allocatedCents
+                require(categoryDraft.confirmedBalanceCents >= 0) {
+                    "Il saldo confermato non può essere negativo"
+                }
+
+                val positiveTransfers = categoryDraft.transfers.filter { it.amountCents > 0 }
+                require(categoryDraft.transfers.all { it.amountCents >= 0 }) {
+                    "Le destinazioni del residuo non possono essere negative"
+                }
+                require(positiveTransfers.sumOf { it.amountCents } == categoryDraft.confirmedBalanceCents) {
+                    "Il residuo della categoria deve essere distribuito completamente"
+                }
+
+                val destinationKeys = positiveTransfers.map {
+                    it.destinationType to it.destinationCategoryId
+                }
+                require(destinationKeys.distinct().size == destinationKeys.size) {
+                    "La stessa destinazione non può essere inserita più volte"
+                }
+
+                positiveTransfers.forEach { transfer ->
+                    when (transfer.destinationType) {
+                        HouseClosingDestinationType.CATEGORY -> {
+                            val destinationId = requireNotNull(transfer.destinationCategoryId) {
+                                "Seleziona una categoria di destinazione"
+                            }
+                            require(destinationId in activeCategoryIds) {
+                                "La categoria di destinazione deve essere attiva"
+                            }
+                        }
+
+                        HouseClosingDestinationType.AVAILABLE -> {
+                            require(transfer.destinationCategoryId == null) {
+                                "Il Disponibile non usa una categoria di destinazione"
+                            }
+                        }
+                    }
+                }
+
+                closingDao.insertCategoryClosing(
+                    HouseMonthCategoryClosingEntity(
+                        houseMonthId = month.id,
+                        categoryId = categoryDraft.categoryId,
+                        calculatedBalanceCents = calculatedBalance,
+                        confirmedBalanceCents = categoryDraft.confirmedBalanceCents,
+                        adjustmentCents = categoryDraft.confirmedBalanceCents - calculatedBalance,
+                        adjustmentNote = normalizedNote(categoryDraft.adjustmentNote),
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                )
+
+                positiveTransfers.forEach { transfer ->
+                    transferEntities += HouseMonthClosingTransferEntity(
+                        houseMonthId = month.id,
+                        sourceCategoryId = categoryDraft.categoryId,
+                        destinationType = transfer.destinationType,
+                        destinationCategoryId = transfer.destinationCategoryId,
+                        amountCents = transfer.amountCents,
+                        createdAt = now
+                    )
+                }
+            }
+
+            if (transferEntities.isNotEmpty()) {
+                closingDao.insertTransfers(transferEntities)
+            }
+
+            houseMonthDao.update(
+                month.copy(
+                    status = HouseMonthStatus.CLOSED,
+                    closedAt = now,
+                    updatedAt = now
+                )
+            )
+        }
+    }
+
     private suspend fun requireOpenMonth(houseMonthId: Long): HouseMonthEntity {
         val month = requireNotNull(houseMonthDao.getById(houseMonthId)) {
             "Mese Casa non trovato"
@@ -233,8 +402,7 @@ class HousePlanRepositoryImpl @Inject constructor(
     }
 
     private suspend fun requirePreviousMonthClosed(year: Int, month: Int) {
-        val previousYear = if (month == 1) year - 1 else year
-        val previousMonth = if (month == 1) 12 else month - 1
+        val (previousYear, previousMonth) = previousMonthOf(year, month)
         val previous = houseMonthDao.getByYearMonth(previousYear, previousMonth) ?: return
         require(previous.status == HouseMonthStatus.CLOSED) {
             "Prima di pianificare questo mese devi chiudere il mese precedente"
@@ -249,6 +417,9 @@ class HousePlanRepositoryImpl @Inject constructor(
         require(draft.totalResourcesCents > 0) {
             "Le risorse del mese devono essere maggiori di zero"
         }
+        require(draft.openingAvailableCents >= 0) {
+            "Il Disponibile iniziale non può essere negativo"
+        }
         require(draft.allocations.isNotEmpty()) {
             "Serve almeno una categoria Casa disponibile"
         }
@@ -262,7 +433,7 @@ class HousePlanRepositoryImpl @Inject constructor(
 
         val allocatedCents = draft.allocations.sumOf { it.allocatedCents }
         require(allocatedCents <= draft.totalResourcesCents) {
-            "Hai allocato più risorse di quelle disponibili"
+            "Hai allocato più nuove risorse di quelle disponibili"
         }
 
         if (validatePositions) {
@@ -273,11 +444,19 @@ class HousePlanRepositoryImpl @Inject constructor(
                 "Le posizioni del denaro non possono essere negative"
             }
             val positionedCents = draft.accountBalances.sumOf { it.amountCents }
-            require(positionedCents <= draft.totalResourcesCents) {
-                "Le posizioni del denaro superano le risorse del mese"
+            require(positionedCents <= totalHouseFundsCents(draft)) {
+                "Le posizioni del denaro superano i fondi Casa complessivi"
             }
         }
     }
+
+    private fun totalHouseFundsCents(draft: HousePlanDraft): Long =
+        draft.totalResourcesCents +
+            draft.openingAvailableCents +
+            draft.allocations.sumOf { it.openingBalanceCents }
+
+    private fun previousMonthOf(year: Int, month: Int): Pair<Int, Int> =
+        if (month == 1) (year - 1) to 12 else year to (month - 1)
 
     private fun normalizedNote(note: String?): String? =
         note?.trim()?.takeIf { it.isNotEmpty() }
