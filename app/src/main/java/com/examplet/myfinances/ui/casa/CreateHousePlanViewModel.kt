@@ -3,6 +3,7 @@ package com.examplet.myfinances.ui.casa
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.examplet.myfinances.domain.model.HouseCategory
+import com.examplet.myfinances.domain.model.HouseMonthCarryover
 import com.examplet.myfinances.domain.model.HousePlanAccountBalanceDraft
 import com.examplet.myfinances.domain.model.HousePlanAllocationDraft
 import com.examplet.myfinances.domain.model.HousePlanDraft
@@ -35,6 +36,7 @@ data class CreateHousePlanUiState(
     val year: Int = LocalDate.now().year,
     val month: Int = LocalDate.now().monthValue,
     val totalResourcesText: String = "",
+    val openingAvailableText: String = "",
     val note: String = "",
     val categories: List<HousePlanCategoryDraftUi> = emptyList(),
     val accounts: List<HousePlanAccountDraftUi> = emptyList(),
@@ -50,23 +52,29 @@ data class CreateHousePlanUiState(
     val openingBalanceCents: Long
         get() = categories.sumOf { parseCentsOrZero(it.openingBalanceText) }
 
+    val openingAvailableCents: Long
+        get() = parseCentsOrZero(openingAvailableText)
+
     val positionedCents: Long
         get() = accounts.sumOf { parseCentsOrZero(it.amountText) }
 
     val totalResourcesCents: Long
         get() = parseCentsOrZero(totalResourcesText)
 
-    val unallocatedCents: Long
-        get() = totalResourcesCents - allocatedCents
+    val availableCents: Long
+        get() = openingAvailableCents + totalResourcesCents - allocatedCents
+
+    val totalHouseFundsCents: Long
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
 
     val unpositionedCents: Long
-        get() = totalResourcesCents - positionedCents
+        get() = totalHouseFundsCents - positionedCents
 
     val allocationOverflowCents: Long
         get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
 
     val positionOverflowCents: Long
-        get() = (positionedCents - totalResourcesCents).coerceAtLeast(0)
+        get() = (positionedCents - totalHouseFundsCents).coerceAtLeast(0)
 
     val hasAllocationOverflow: Boolean
         get() = allocationOverflowCents > 0
@@ -93,18 +101,43 @@ class CreateHousePlanViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CreateHousePlanUiState())
     val uiState: StateFlow<CreateHousePlanUiState> = _uiState.asStateFlow()
 
+    private var carryover: HouseMonthCarryover? = null
+
     init {
+        viewModelScope.launch {
+            val state = _uiState.value
+            carryover = housePlanRepository.getCarryoverFor(state.year, state.month)
+            val loadedCarryover = carryover ?: HouseMonthCarryover()
+            _uiState.value = _uiState.value.copy(
+                openingAvailableText = formatCentsForInput(loadedCarryover.availableCents),
+                categories = _uiState.value.categories.map { row ->
+                    if (row.openingBalanceText.isNotBlank()) row
+                    else row.copy(
+                        openingBalanceText = formatCentsForInput(
+                            loadedCarryover.categoryOpeningCents[row.category.id] ?: 0
+                        )
+                    )
+                }
+            )
+        }
+
         viewModelScope.launch {
             categoryRepository.observeCategories().collect { categories ->
                 val previous = _uiState.value.categories.associateBy { it.category.id }
                 _uiState.value = _uiState.value.copy(
                     categories = categories.map { category ->
                         previous[category.id]?.copy(category = category)
-                            ?: HousePlanCategoryDraftUi(category)
+                            ?: HousePlanCategoryDraftUi(
+                                category = category,
+                                openingBalanceText = formatCentsForInput(
+                                    carryover?.categoryOpeningCents?.get(category.id) ?: 0
+                                )
+                            )
                     }
                 )
             }
         }
+
         viewModelScope.launch {
             moneyAccountRepository.observeAccounts().collect { accounts ->
                 val previous = _uiState.value.accounts.associateBy { it.account.id }
@@ -120,6 +153,10 @@ class CreateHousePlanViewModel @Inject constructor(
 
     fun updateTotalResources(value: String) {
         _uiState.value = _uiState.value.copy(totalResourcesText = value, errorMessage = null)
+    }
+
+    fun updateOpeningAvailable(value: String) {
+        _uiState.value = _uiState.value.copy(openingAvailableText = value, errorMessage = null)
     }
 
     fun updateNote(value: String) {
@@ -201,6 +238,10 @@ class CreateHousePlanViewModel @Inject constructor(
                         year = state.year,
                         month = state.month,
                         totalResourcesCents = totalResourcesCents,
+                        openingAvailableCents = parseEuroToCents(
+                            state.openingAvailableText,
+                            allowBlank = true
+                        ),
                         note = state.note,
                         allocations = allocations,
                         accountBalances = accountBalances
