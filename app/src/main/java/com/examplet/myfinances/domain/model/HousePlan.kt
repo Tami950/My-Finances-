@@ -27,6 +27,7 @@ data class HousePlanDetails(
     val month: Int,
     val totalResourcesCents: Long,
     val openingAvailableCents: Long,
+    val pendingFixedExpensesCents: Long = 0,
     val note: String?,
     val status: HouseMonthStatus,
     val closedAt: Long?,
@@ -46,7 +47,7 @@ data class HousePlanDetails(
         get() = openingAvailableCents + totalResourcesCents - allocatedCents
 
     val totalHouseFundsCents: Long
-        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents + pendingFixedExpensesCents
 
     val unpositionedCents: Long
         get() = totalHouseFundsCents - positionedCents
