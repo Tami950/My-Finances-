@@ -2,7 +2,9 @@ package com.examplet.myfinances.ui.casa
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.examplet.myfinances.domain.model.FixedExpensePaymentStatus
 import com.examplet.myfinances.domain.model.HouseCategory
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseMonthCarryover
 import com.examplet.myfinances.domain.model.HousePlanAccountBalanceDraft
 import com.examplet.myfinances.domain.model.HousePlanAllocationDraft
@@ -46,49 +48,21 @@ data class CreateHousePlanUiState(
     val isSaving: Boolean = false,
     val isSaved: Boolean = false
 ) {
-    val allocatedCents: Long
-        get() = categories.sumOf { parseCentsOrZero(it.allocatedText) }
-
-    val openingBalanceCents: Long
-        get() = categories.sumOf { parseCentsOrZero(it.openingBalanceText) }
-
-    val openingAvailableCents: Long
-        get() = parseCentsOrZero(openingAvailableText)
-
-    val positionedCents: Long
-        get() = accounts.sumOf { parseCentsOrZero(it.amountText) }
-
-    val totalResourcesCents: Long
-        get() = parseCentsOrZero(totalResourcesText)
-
-    val availableCents: Long
-        get() = openingAvailableCents + totalResourcesCents - allocatedCents
-
-    val totalHouseFundsCents: Long
-        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
-
-    val unpositionedCents: Long
-        get() = totalHouseFundsCents - positionedCents
-
-    val allocationOverflowCents: Long
-        get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
-
-    val positionOverflowCents: Long
-        get() = (positionedCents - totalHouseFundsCents).coerceAtLeast(0)
-
-    val hasAllocationOverflow: Boolean
-        get() = allocationOverflowCents > 0
-
-    val hasPositionOverflow: Boolean
-        get() = positionOverflowCents > 0
-
+    val allocatedCents: Long get() = categories.sumOf { parseCentsOrZero(it.allocatedText) }
+    val openingBalanceCents: Long get() = categories.sumOf { parseCentsOrZero(it.openingBalanceText) }
+    val openingAvailableCents: Long get() = parseCentsOrZero(openingAvailableText)
+    val positionedCents: Long get() = accounts.sumOf { parseCentsOrZero(it.amountText) }
+    val totalResourcesCents: Long get() = parseCentsOrZero(totalResourcesText)
+    val availableCents: Long get() = openingAvailableCents + totalResourcesCents - allocatedCents
+    val totalHouseFundsCents: Long get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
+    val unpositionedCents: Long get() = totalHouseFundsCents - positionedCents
+    val allocationOverflowCents: Long get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
+    val positionOverflowCents: Long get() = (positionedCents - totalHouseFundsCents).coerceAtLeast(0)
+    val hasAllocationOverflow: Boolean get() = allocationOverflowCents > 0
+    val hasPositionOverflow: Boolean get() = positionOverflowCents > 0
     val canSave: Boolean
-        get() = !isSaving &&
-            categories.isNotEmpty() &&
-            accounts.isNotEmpty() &&
-            totalResourcesCents > 0 &&
-            !hasAllocationOverflow &&
-            !hasPositionOverflow
+        get() = !isSaving && categories.isNotEmpty() && accounts.isNotEmpty() &&
+            totalResourcesCents > 0 && !hasAllocationOverflow && !hasPositionOverflow
 }
 
 @HiltViewModel
@@ -97,10 +71,8 @@ class CreateHousePlanViewModel @Inject constructor(
     private val moneyAccountRepository: MoneyAccountRepository,
     private val housePlanRepository: HousePlanRepository
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(CreateHousePlanUiState())
     val uiState: StateFlow<CreateHousePlanUiState> = _uiState.asStateFlow()
-
     private var carryover: HouseMonthCarryover? = null
 
     init {
@@ -120,7 +92,6 @@ class CreateHousePlanViewModel @Inject constructor(
                 }
             )
         }
-
         viewModelScope.launch {
             categoryRepository.observeCategories().collect { categories ->
                 val previous = _uiState.value.categories.associateBy { it.category.id }
@@ -130,49 +101,30 @@ class CreateHousePlanViewModel @Inject constructor(
                             ?: HousePlanCategoryDraftUi(
                                 category = category,
                                 openingBalanceText = carryover?.let { loaded ->
-                                    formatCentsForInput(
-                                        loaded.categoryOpeningCents[category.id] ?: 0
-                                    )
+                                    formatCentsForInput(loaded.categoryOpeningCents[category.id] ?: 0)
                                 }.orEmpty()
                             )
                     }
                 )
             }
         }
-
         viewModelScope.launch {
             moneyAccountRepository.observeAccounts().collect { accounts ->
                 val previous = _uiState.value.accounts.associateBy { it.account.id }
                 _uiState.value = _uiState.value.copy(
                     accounts = accounts.map { account ->
-                        previous[account.id]?.copy(account = account)
-                            ?: HousePlanAccountDraftUi(account)
+                        previous[account.id]?.copy(account = account) ?: HousePlanAccountDraftUi(account)
                     }
                 )
             }
         }
     }
 
-    fun updateTotalResources(value: String) {
-        _uiState.value = _uiState.value.copy(totalResourcesText = value, errorMessage = null)
-    }
-
-    fun updateOpeningAvailable(value: String) {
-        _uiState.value = _uiState.value.copy(openingAvailableText = value, errorMessage = null)
-    }
-
-    fun updateNote(value: String) {
-        _uiState.value = _uiState.value.copy(note = value)
-    }
-
-    fun openCategory(categoryId: Long) {
-        _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId, errorMessage = null)
-    }
-
-    fun dismissCategory() {
-        _uiState.value = _uiState.value.copy(selectedCategoryId = null, errorMessage = null)
-    }
-
+    fun updateTotalResources(value: String) { _uiState.value = _uiState.value.copy(totalResourcesText = value, errorMessage = null) }
+    fun updateOpeningAvailable(value: String) { _uiState.value = _uiState.value.copy(openingAvailableText = value, errorMessage = null) }
+    fun updateNote(value: String) { _uiState.value = _uiState.value.copy(note = value) }
+    fun openCategory(categoryId: Long) { _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId, errorMessage = null) }
+    fun dismissCategory() { _uiState.value = _uiState.value.copy(selectedCategoryId = null, errorMessage = null) }
     fun updateOpeningBalance(categoryId: Long, value: String) {
         _uiState.value = _uiState.value.copy(
             categories = _uiState.value.categories.map {
@@ -181,7 +133,6 @@ class CreateHousePlanViewModel @Inject constructor(
             errorMessage = null
         )
     }
-
     fun updateAllocated(categoryId: Long, value: String) {
         _uiState.value = _uiState.value.copy(
             categories = _uiState.value.categories.map {
@@ -190,15 +141,8 @@ class CreateHousePlanViewModel @Inject constructor(
             errorMessage = null
         )
     }
-
-    fun openAccount(accountId: Long) {
-        _uiState.value = _uiState.value.copy(selectedAccountId = accountId, errorMessage = null)
-    }
-
-    fun dismissAccount() {
-        _uiState.value = _uiState.value.copy(selectedAccountId = null, errorMessage = null)
-    }
-
+    fun openAccount(accountId: Long) { _uiState.value = _uiState.value.copy(selectedAccountId = accountId, errorMessage = null) }
+    fun dismissAccount() { _uiState.value = _uiState.value.copy(selectedAccountId = null, errorMessage = null) }
     fun updateAccountAmount(accountId: Long, value: String) {
         _uiState.value = _uiState.value.copy(
             accounts = _uiState.value.accounts.map {
@@ -211,7 +155,6 @@ class CreateHousePlanViewModel @Inject constructor(
     fun savePlan() {
         val currentState = _uiState.value
         if (!currentState.canSave) return
-
         viewModelScope.launch {
             runCatching {
                 val state = _uiState.value
@@ -219,12 +162,15 @@ class CreateHousePlanViewModel @Inject constructor(
                 require(totalResourcesCents > 0) { "Inserisci risorse del mese maggiori di zero" }
                 require(state.categories.isNotEmpty()) { "Serve almeno una categoria Casa attiva" }
                 require(state.accounts.isNotEmpty()) { "Serve almeno una posizione del denaro attiva" }
-
                 val allocations = state.categories.map { row ->
                     HousePlanAllocationDraft(
                         categoryId = row.category.id,
                         openingBalanceCents = parseEuroToCents(row.openingBalanceText, allowBlank = true),
-                        allocatedCents = parseEuroToCents(row.allocatedText, allowBlank = true)
+                        allocatedCents = parseEuroToCents(row.allocatedText, allowBlank = true),
+                        categoryBehavior = row.category.behavior,
+                        fixedExpensePaymentStatus = if (row.category.behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                            FixedExpensePaymentStatus.PLANNED
+                        } else null
                     )
                 }
                 val accountBalances = state.accounts.map { row ->
@@ -233,17 +179,13 @@ class CreateHousePlanViewModel @Inject constructor(
                         amountCents = parseEuroToCents(row.amountText, allowBlank = true)
                     )
                 }
-
                 _uiState.value = state.copy(isSaving = true, errorMessage = null)
                 housePlanRepository.createPlan(
                     HousePlanDraft(
                         year = state.year,
                         month = state.month,
                         totalResourcesCents = totalResourcesCents,
-                        openingAvailableCents = parseEuroToCents(
-                            state.openingAvailableText,
-                            allowBlank = true
-                        ),
+                        openingAvailableCents = parseEuroToCents(state.openingAvailableText, allowBlank = true),
                         note = state.note,
                         allocations = allocations,
                         accountBalances = accountBalances
