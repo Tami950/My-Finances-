@@ -32,11 +32,8 @@ class HouseCategoryRepositoryImpl @Inject constructor(
     ): Long {
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Il nome della categoria non può essere vuoto" }
-        require(houseCategoryDao.countByName(normalizedName) == 0) {
-            "Esiste già una categoria con questo nome"
-        }
+        require(houseCategoryDao.countByName(normalizedName) == 0) { "Esiste già una categoria con questo nome" }
         validateCategory(behavior, type, targetCents, fixedExpenseDefaultCents)
-
         val now = System.currentTimeMillis()
         return houseCategoryDao.insert(
             HouseCategoryEntity(
@@ -63,9 +60,7 @@ class HouseCategoryRepositoryImpl @Inject constructor(
     ) {
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Il nome della categoria non può essere vuoto" }
-        require(houseCategoryDao.countByName(normalizedName, excludeId = id) == 0) {
-            "Esiste già una categoria con questo nome"
-        }
+        require(houseCategoryDao.countByName(normalizedName, excludeId = id) == 0) { "Esiste già una categoria con questo nome" }
         validateCategory(behavior, type, targetCents, fixedExpenseDefaultCents)
 
         val current = requireNotNull(houseCategoryDao.getById(id)) { "Categoria non trovata" }
@@ -82,22 +77,17 @@ class HouseCategoryRepositoryImpl @Inject constructor(
             )
         )
 
-        allocationDao.updateBehaviorForOpenMonths(
-            categoryId = id,
-            behavior = behavior,
-            paymentStatus = if (behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
-                FixedExpensePaymentStatus.PLANNED
-            } else null,
-            fixedExpensePlannedCents = fixedDefault,
-            updatedAt = now
-        )
-
-        if (
-            behavior == HouseCategoryBehavior.FIXED_EXPENSE &&
-            applyFixedExpenseDefaultToOpenMonth &&
-            fixedDefault != null
-        ) {
-            allocationDao.updateFixedExpensePlanForOpenMonths(id, fixedDefault, now)
+        // A default amount is future-facing. An OPEN month is only converted when the
+        // category behavior itself changes; its amount is reconciled separately by HousePlanRepository.
+        if (current.behavior != behavior && applyFixedExpenseDefaultToOpenMonth) {
+            allocationDao.updateBehaviorForOpenMonths(
+                categoryId = id,
+                behavior = behavior,
+                paymentStatus = if (behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                    FixedExpensePaymentStatus.PLANNED
+                } else null,
+                updatedAt = now
+            )
         }
     }
 
