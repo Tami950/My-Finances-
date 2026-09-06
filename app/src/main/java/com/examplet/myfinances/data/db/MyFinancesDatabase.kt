@@ -11,6 +11,7 @@ import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.dao.MoneyAccountDao
 import com.examplet.myfinances.data.entity.HouseCategoryEntity
 import com.examplet.myfinances.data.entity.HouseMonthAccountBalanceEntity
+import com.examplet.myfinances.data.entity.HouseMonthAvailableClosingTransferEntity
 import com.examplet.myfinances.data.entity.HouseMonthCategoryClosingEntity
 import com.examplet.myfinances.data.entity.HouseMonthClosingEntity
 import com.examplet.myfinances.data.entity.HouseMonthClosingTransferEntity
@@ -27,9 +28,10 @@ import com.examplet.myfinances.data.entity.MoneyAccountEntity
         HouseMonthAccountBalanceEntity::class,
         HouseMonthClosingEntity::class,
         HouseMonthCategoryClosingEntity::class,
-        HouseMonthClosingTransferEntity::class
+        HouseMonthClosingTransferEntity::class,
+        HouseMonthAvailableClosingTransferEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
