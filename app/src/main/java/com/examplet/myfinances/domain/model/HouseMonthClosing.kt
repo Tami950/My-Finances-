@@ -2,6 +2,7 @@ package com.examplet.myfinances.domain.model
 
 data class HouseMonthCarryover(
     val categoryOpeningCents: Map<Long, Long> = emptyMap(),
+    val fixedExpensePrefundedCents: Map<Long, Long> = emptyMap(),
     val availableCents: Long = 0
 )
 
