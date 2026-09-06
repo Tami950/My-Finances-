@@ -1,6 +1,6 @@
 # MyFinances - Flussi UX, Stati ed Edge Case v1
 
-Data: 30 agosto 2026
+Data: 6 settembre 2026
 Scopo: descrivere come si muove l'utente nelle sezioni, cosa puo' modificare e quali casi limite devono essere gestiti.
 
 ## 1. Principio di responsabilita' delle sezioni
@@ -8,12 +8,12 @@ Scopo: descrivere come si muove l'utente nelle sezioni, cosa puo' modificare e q
 ### Dashboard
 Risponde a: "Cosa devo sapere adesso?"
 
-Mostra sintesi e KPI cross-app. Non e' il luogo principale per modificare la pianificazione Casa.
+Mostra sintesi cross-app. Non e' il luogo principale per modificare la pianificazione Casa.
 
 ### Casa / Pianificazione
 Risponde a: "Come gestisco il mese Casa?"
 
-E' la schermata operativa del mese: risorse, categorie, posizioni, stato mese, modifiche e chiusura.
+E' la schermata operativa del mese: risorse, categorie, Disponibile, posizioni, stato mese, modifiche e chiusura.
 
 ### Casa / Personalizzazione
 Risponde a: "Quali categorie e posizioni esistono e come sono configurate?"
@@ -22,16 +22,14 @@ Modifica definizioni globali, non saldi mensili.
 
 ## 2. Ingresso in Casa
 Regola UX:
-- ogni ingresso in Casa dalla bottom navigation atterra su Pianificazione;
-- Personalizzazione non rimane selezionata come destinazione di ingresso tra una visita e l'altra.
+- ogni nuovo ingresso in Casa dalla bottom navigation atterra su Pianificazione;
+- una semplice rotazione/configuration change non resetta la tab corrente.
 
 Caso:
 1. Casa -> Personalizzazione;
 2. bottom bar -> Bollette;
 3. bottom bar -> Casa;
 4. risultato atteso: Pianificazione.
-
-La navigazione interna eventualmente piu' profonda di Casa deve essere riportata alla home appropriata quando si rientra dalla bottom navigation, secondo la policy che verra' implementata.
 
 ## 3. Setup Casa
 Se isHouseSetupCompleted = false:
@@ -40,10 +38,14 @@ Se isHouseSetupCompleted = false:
 - setup completabile con almeno una categoria attiva e un money account attivo;
 - completamento persistito in DataStore.
 
+Dopo il setup:
+- per creare un nuovo piano servono ancora almeno una categoria attiva e un money account attivo;
+- un piano gia' esistente resta consultabile anche se successivamente tutte le entita' vengono archiviate.
+
 ## 4. Creazione primo mese
 Se setup completato e non esiste il mese corrente:
 - mostra "Pianifica mese";
-- apre schermata CreateHousePlan;
+- apre CreateHousePlan;
 - carica categorie e money account attivi;
 - l'utente inserisce risorse totali, allocazioni e posizioni;
 - salva tutto atomicamente.
@@ -51,34 +53,32 @@ Se setup completato e non esiste il mese corrente:
 Se non esiste alcun mese precedente, opening balance suggerito = 0.
 
 ## 5. Creazione mese successivo
-Requisito:
+Regola:
 - se il mese precedente esiste ed e' OPEN, il mese successivo non e' pianificabile;
 - l'utente deve prima chiudere il mese precedente;
-- dopo la chiusura, gli opening balance vengono proposti dai residui finali consolidati;
+- dopo la chiusura, gli opening balance vengono proposti dalla distribuzione dei residui finali;
 - dato assente -> 0;
 - opening balance resta modificabile.
 
-La UX completa per navigazione a mesi futuri verra' definita dopo il flusso di chiusura.
+Gli importi inviati al Disponibile in chiusura non diventano opening di categorie.
 
 ## 6. Schermata Pianificazione con mese OPEN
-Struttura prevista:
-
 Header:
 - mese/anno;
-- badge o label Aperto;
+- badge/label Aperto;
 - risorse totali.
 
 Riepilogo:
 - Allocato nel mese;
-- Da allocare.
+- Disponibile Casa.
 
 Sezione categorie:
 - card uniforme per ogni categoria inclusa nel mese;
 - nome;
 - gia' presente;
 - nuova allocazione;
-- totale disponibile;
-- in futuro speso/residuo.
+- totale disponibile teorico;
+- in futuro speso/residuo corrente.
 
 Azioni:
 - Modifica pianificazione;
@@ -90,7 +90,7 @@ Sezione posizione attuale:
 - da posizionare;
 - Modifica posizioni.
 
-Footer/azione principale:
+Footer:
 - Chiudi mese.
 
 ## 7. Modifica pianificazione
@@ -103,17 +103,10 @@ Consente di modificare:
 - nota;
 - inclusione/nascondimento mensile delle categorie quando disponibile.
 
-Non consente di modificare:
-- nome globale categoria;
-- tipo FLEXIBLE/TARGET;
-- target globale;
-- archivio globale;
-- ordine globale.
+Non modifica le proprieta' globali della categoria.
 
-Queste operazioni appartengono a Personalizzazione.
-
-## 8. Card categoria e dettaglio futuro
-La card non e' un pulsante di modifica globale.
+## 8. Card categoria e dettaglio movimenti
+La card non modifica la categoria globale.
 
 Click futuro apre dettaglio della categoria nel mese:
 - elenco movimenti;
@@ -127,253 +120,305 @@ Esempio:
 - uscita 20 EUR;
 - residuo 130 EUR.
 
-Il movimento influenza la situazione mensile, non la definizione globale "Gatto".
+## 9. Disponibile Casa
+Il Disponibile Casa e' liquidita' non vincolata ad alcuna categoria. Non deve necessariamente essere allocato.
 
-## 9. Nascondere una categoria dal mese
+Non e' una categoria fittizia.
+
+Con i movimenti potra' avere operazioni proprie, ad esempio:
+- Disponibile 300 EUR;
+- pizza non categorizzata -15 EUR;
+- Disponibile 285 EUR.
+
+Una spesa con nessuna categoria logica appartiene al Disponibile e deve rimanere tracciabile.
+
+## 10. Nascondere una categoria dal mese
 Caso d'uso:
 - categoria esiste globalmente ma non serve in un determinato mese.
 
 Azione corretta:
 - "Nascondi dal mese" / "Escludi dal mese".
 
-Non equivale a:
-- eliminare categoria;
-- archiviare categoria.
+Non equivale a eliminare o archiviare globalmente.
 
-Il mese storico deve ricordare la propria configurazione.
+## 11. Archiviazione ed eliminazione globale futura
+Archiviazione:
+- mantiene l'entita' e lo storico;
+- esclude dai nuovi piani;
+- consente riattivazione.
 
-## 10. Archiviazione globale categoria
-In Personalizzazione:
-- categoria archiviata resta visibile attenuata;
-- non e' selezionabile nei nuovi piani;
-- puo' essere riattivata;
-- mantiene validita' nello storico.
-
-## 11. Eliminazione globale futura
-Se l'utente chiede delete reale:
-- se saldo logico/residuo > 0, delete bloccata;
-- aprire modal/bottom sheet che richiede riallocazione del denaro;
-- solo dopo saldo zero si puo' procedere;
-- lo storico non deve perdere riferimenti o significato.
-
-Edge case da progettare prima del codice: categoria gia' usata in mesi CLOSED.
+Delete reale futura:
+- se esiste denaro, bloccare e chiedere riallocazione;
+- se esiste storico, preservarne significato e riferimenti;
+- progettare la strategia tecnica prima di implementare il pulsante definitivo.
 
 ## 12. Posizione attuale dei soldi
 Rappresenta esclusivamente dove si trova ORA il denaro Casa.
 
-Esempio iniziale:
-- Libretto 2000;
-- Quaderno 0;
-- Online 0.
-
-Dopo prelievo 1400:
-- Libretto 600;
-- Quaderno 1400;
-- Online 0.
-
-Dopo spostamento 1000 dal Quaderno a Online:
+Esempio:
 - Libretto 600;
 - Quaderno 400;
-- Online 1000.
-
-Errore da evitare:
-- Libretto 600;
-- Quaderno 1400;
 - Online 1000;
-- totale 3000 su risorse 2000.
+- totale Casa 2000.
+
+Lo stesso denaro non puo' essere contato in piu' posizioni.
 
 ## 13. Modifica posizioni
 Disponibile su mese OPEN.
 
-L'utente puo' aggiornare i saldi correnti quando preleva/sposta denaro.
-
 Validazione:
 - valori individuali >= 0;
 - somma <= risorse totali;
-- se somma < totale, mostra "Da posizionare";
-- se somma > totale, errore immediato e salvataggio disabilitato.
+- somma < totale consentita con "Da posizionare";
+- somma > totale blocca subito il salvataggio.
+
+Gli input precompilati possono essere azzerati rapidamente tramite trailing action.
 
 ## 14. Storico posizioni futuro
-La card delle posizioni dovra' poter aprire un dettaglio con storico del mese.
-
-Modello desiderato finale:
+Modello desiderato:
 - movimento Libretto -> Quaderno 1400;
 - movimento Quaderno -> Online 1000.
 
-Lo storico non deve essere ricostruito confrontando snapshot arbitrari se possiamo registrare movimenti espliciti.
+Lo storico deve derivare da movimenti espliciti, non dal confronto tra snapshot arbitrari.
 
 ## 15. Validazioni immediate
-La UI non deve accettare stati monetari impossibili e poi mostrare solo un errore al salvataggio.
+La UI segnala subito stati monetari impossibili e disabilita Salva. Il repository ripete le invarianti.
 
-Esempio allocazioni:
+Esempio:
 - risorse 2000;
-- nuove allocazioni 2100;
-- errore immediato;
+- allocazioni 2100;
+- overflow 100;
 - Salva disabilitato.
 
-Esempio posizioni:
-- risorse 2000;
-- posizioni 2300;
-- errore immediato;
-- Salva disabilitato.
-
-Il repository ripete comunque le invarianti.
-
-## 16. Chiusura mese
+## 16. Chiusura mese - flusso definitivo v1
 Disponibile solo su OPEN.
 
-Obiettivi:
-- consolidare spese/movimenti;
-- determinare residui finali;
-- decidere destinazione residui;
-- salvare closedAt;
-- impostare status CLOSED;
-- preparare dati per il mese successivo.
+### 16.1 Saldo calcolato e saldo confermato
+Per ogni categoria il wizard mostra:
+- saldo calcolato dall'app;
+- saldo finale confermato;
+- eventuale rettifica = confermato - calcolato;
+- eventuale nota di rettifica.
 
-Un mese CLOSED e' storico e non viene modificato dai flussi ordinari.
+Il saldo confermato e' SEMPRE modificabile, anche quando saranno presenti tutti i movimenti.
 
-Eventuale "Riapri mese" e correzioni a posteriori sono funzionalita' future da progettare esplicitamente.
+Motivazione:
+- spese dimenticate;
+- discrepanze reali;
+- correzioni manuali;
+- necessita' di non falsificare lo storico.
 
-## 17. Navigazione mesi
-Requisito registrato:
-- controllo mese precedente;
-- controllo mese successivo;
-- accesso allo storico;
-- mese corrente come default.
+Il sistema conserva sia il calcolato sia il confermato e non riscrive i movimenti per farli coincidere.
 
-Da definire dopo chiusura mese:
+### 16.2 Distribuzione residuo
+Per ogni saldo finale confermato > 0 l'utente distribuisce l'intero residuo verso una o piu' destinazioni:
+- stessa categoria nel mese successivo;
+- altra categoria nel mese successivo;
+- piu' categorie con split;
+- Disponibile del mese successivo.
+
+"Mantieni" e' solo una scorciatoia UX per categoria sorgente -> stessa categoria.
+
+Esempio valido:
+- residuo Gatto 200;
+- Gatto 100;
+- Farmacia 50;
+- Disponibile 50;
+- totale distribuito 200.
+
+Esempi non validi:
+- totale 190 su residuo 200;
+- totale 210 su residuo 200.
+
+Invariante:
+- somma destinazioni = saldo finale confermato;
+- ogni importo >= 0.
+
+Nessun Fondo Casa separato nella prima versione.
+
+### 16.3 Conferma chiusura
+Il pulsante Chiudi mese e' attivo solo quando:
+- ogni saldo confermato e' valido;
+- ogni residuo positivo e' completamente distribuito;
+- nessuna distribuzione supera il proprio residuo;
+- il mese e' ancora OPEN.
+
+La conferma salva atomicamente:
+- saldo calcolato per categoria;
+- saldo confermato;
+- rettifica;
+- nota rettifica;
+- distribuzioni residue;
+- status CLOSED;
+- closedAt.
+
+Dopo la chiusura:
+- il mese diventa storico;
+- le modifiche ordinarie sono bloccate;
+- il mese successivo diventa pianificabile;
+- la pianificazione successiva usa le distribuzioni di chiusura come suggerimenti opening.
+
+## 17. Autocompletamento del mese successivo
+Per ogni categoria attiva del nuovo mese:
+- sommare tutte le distribuzioni del precedente CLOSED dirette a quella categoria;
+- usare il risultato come opening suggerito;
+- se nessuna distribuzione -> 0;
+- lasciare sempre il campo modificabile.
+
+Esempio chiusura agosto:
+- Cibo -> Cibo 80;
+- Gatto -> Gatto 100;
+- Gatto -> Farmacia 50;
+- Gatto -> Disponibile 50;
+- Farmacia -> Farmacia 20.
+
+Opening settembre:
+- Cibo 80;
+- Gatto 100;
+- Farmacia 70.
+
+Il Disponibile trasferito viene gestito separatamente e non crea una categoria fittizia.
+
+## 18. Navigazione mesi
+Da implementare subito dopo chiusura + autocompletamento.
+
+Requisiti:
+- mese corrente default;
+- precedente/successivo;
+- accesso ai CLOSED;
+- OPEN chiaramente distinguibile;
+- blocco del futuro quando la sequenza temporale non e' valida.
+
+Da definire nel dettaglio durante l'implementazione:
 - quanti mesi futuri mostrare;
-- se permettere creazione di mesi futuri oltre il prossimo;
-- comportamento se ci sono buchi temporali;
-- policy per mesi CLOSED/OPEN durante la navigazione.
+- eventuali buchi;
+- comportamento del successivo non ancora creato.
 
-## 18. Dashboard
-La Dashboard non duplica il manager mensile.
+## 19. Movimenti categorie e Disponibile
+Dopo la navigazione mesi:
+- uscite;
+- entrate;
+- rettifiche;
+- data operazione;
+- nota;
+- categoria opzionale: null significa Disponibile;
+- saldo corrente derivato.
 
-Mostra almeno in futuro:
-- Disponibile da spendere PERSONALE realmente libero;
-- stato Casa del mese;
-- risorse Casa;
-- da allocare Casa;
-- categorie principali/evidenziate;
-- posizione sintetica denaro Casa;
-- bollette rilevanti;
-- sintesi Personale.
+Il saldo calcolato in chiusura diventera' progressivamente affidabile grazie a questi movimenti.
 
-Importante:
-- "Disponibile da spendere" = personale;
-- "Da allocare" = Casa, nuove risorse non ancora assegnate;
-- non usare un generico "Residuo Casa" per entrambi i concetti.
+## 20. Dashboard
+La Dashboard non duplica Casa.
 
-## 19. Categorie principali Dashboard
-Requisito futuro:
-- l'utente potra' probabilmente scegliere quali categorie mostrare in Dashboard;
-- candidato: flag esplicito nella personalizzazione categoria;
-- da coordinare con ordinamento personalizzato.
+Distinzioni:
+- Disponibile da spendere = personale;
+- Disponibile Casa = liquidita' Casa non vincolata;
+- residuo categoria = saldo corrente della specifica categoria.
 
-## 20. Componenti UI riusabili
-Regola:
-- comportamento strutturale ripetuto -> componente condiviso;
-- evitare mega-componenti che contengono logica di dominio.
+## 21. Analisi & Suggerimenti - audit mandatorio post-Casa
+Dopo aver completato l'intero flusso Casa, prima di considerare il dominio stabile, eseguire un audit dedicato orientato alla futura sezione Analisi & Suggerimenti.
 
+L'audit deve verificare che il sistema conservi dati sufficienti a ricostruire:
+- allocazioni pianificate;
+- saldi iniziali;
+- singoli movimenti;
+- sforamenti;
+- residui;
+- rettifiche manuali;
+- differenza tra saldo calcolato e reale;
+- distribuzioni di chiusura;
+- spostamenti frequenti tra categorie;
+- uso del Disponibile;
+- cambiamenti delle posizioni fisiche.
+
+Principio:
+- dato grezzo -> indicatore -> suggerimento.
+
+Non salvare come fonte di verita' un suggerimento o un aggregato se puo' essere ricalcolato dai dati primari.
+
+Indicatori candidati:
+- categoria sottostimata/sovrastimata;
+- sforamenti frequenti;
+- residuo medio elevato;
+- rettifiche frequenti;
+- categoria quasi inutilizzata;
+- allocazioni instabili;
+- categorie candidate ad accorpamento/scorporo;
+- consumo medio del Disponibile.
+
+Suggerimenti futuri devono essere proposte motivate dai dati, non prescrizioni.
+
+## 22. Componenti UI riusabili
 Gia' presenti:
 - AppScreen;
-- AppModalBottomSheet.
+- AppModalBottomSheet;
+- AppContentCard.
 
-Prossimi candidati quando la UI operativa si stabilizza:
+Candidati:
 - card categoria mensile;
-- card posizione denaro;
+- card posizione;
 - badge stato mese;
 - righe monetarie;
-- empty/error state.
+- empty/error state;
+- componenti del wizard di chiusura.
 
-## 21. Edge case checklist
-- duplicato categoria con differenze solo di case/spazi -> rifiutato;
-- categoria archiviata con stesso nome -> riattivare, non duplicare;
+## 23. Edge case checklist
 - categoria archiviata resta valida nello storico;
 - delete con soldi -> bloccare e riallocare;
-- delete con storico -> preservare significato storico;
-- opening balance mancante -> 0;
-- opening balance suggerito discrepante -> modificabile;
+- delete con storico -> preservare significato;
+- opening mancante -> 0;
+- opening suggerito -> sempre modificabile;
 - allocazioni oltre risorse -> blocco;
 - posizioni oltre risorse -> blocco;
-- posizioni sotto risorse -> consentito con "Da posizionare";
-- stesso denaro su due posizioni -> modello non valido;
-- rientro in Casa dalla bottom bar -> Pianificazione;
+- posizioni sotto risorse -> consentito;
 - mese precedente OPEN -> blocco nuovo mese;
 - mese CLOSED -> niente modifiche ordinarie;
-- categoria non usata nel mese -> nascondi/escludi, non delete globale;
-- rotazione con form/sheet aperto -> stato conservato dal ViewModel;
-- tastiera landscape -> contenuto sheet raggiungibile e scrollabile.
+- piano esistente resta visibile anche se setup corrente non e' piu' sufficiente;
+- residuo distribuito meno del confermato -> blocco chiusura;
+- residuo distribuito oltre il confermato -> blocco chiusura;
+- saldo confermato diverso dal calcolato -> conservare rettifica;
+- saldo confermato 0 -> nessuna distribuzione necessaria;
+- categoria destinazione archiviata prima del mese successivo -> non deve produrre perdita di denaro; gestire esplicitamente nel flusso di creazione/chiusura;
+- rotazione con form/sheet aperto -> stato conservato;
+- tastiera landscape -> contenuto raggiungibile.
 
-## 22. Piano di lavoro per chiudere Pianificazione v1
-Ordine raccomandato:
+## 24. Piano corrente per chiudere Casa
+Ordine concordato:
 
-### P1 - Stato mese e regole temporali
-1. aggiungere HouseMonthStatus OPEN/CLOSED e closedAt a house_months;
-2. migrare/versionare Room;
-3. esporre status nel dominio/repository;
-4. bloccare creazione del mese successivo se il precedente e' OPEN.
+### C1 - Chiusura mese
+- persistenza del riepilogo di chiusura per categoria;
+- saldo calcolato/confermato;
+- rettifica e nota;
+- distribuzioni residue;
+- transazione OPEN -> CLOSED.
 
-### P2 - Correggere ingresso Casa
-1. quando si seleziona Casa dalla bottom navigation, atterrare sempre su Pianificazione;
-2. definire reset della navigazione interna Casa senza perdere stato persistente.
+### C2 - Autocompletamento mese successivo
+- opening suggeriti dalle distribuzioni;
+- Disponibile trasferito gestito separatamente;
+- fallback 0;
+- valori modificabili.
 
-### P3 - Validazioni planner
-1. errori live per allocazioni > risorse;
-2. errori live per posizioni > risorse;
-3. Salva disabilitato in stato invalido;
-4. stessi check nel repository.
+### C3 - Navigazione mesi
+- storico e precedente/successivo;
+- regole temporali.
 
-### P4 - Opening balance suggerito
-1. repository per recuperare il mese precedente CLOSED;
-2. sorgente del residuo finale;
-3. fallback 0;
-4. valore modificabile.
+### C4 - Movimenti categorie + Disponibile
+- entrate/uscite/rettifiche;
+- saldi correnti;
+- storico.
 
-Nota: finche' non esiste un residuo finale affidabile, il sistema usa 0 e non inventa dati.
+### C5 - Movimenti posizioni
+- trasferimenti atomici;
+- storico;
+- correzione saldo separata.
 
-### P5 - Pianificazione mese esistente: schermata operativa
-1. mostra stato mese e risorse;
-2. mostra riepilogo Allocato/Da allocare;
-3. mostra tutte le categorie del mese come card;
-4. mostra opening/allocated/totale;
-5. mostra posizione attuale dei soldi;
-6. aggiungi Modifica pianificazione;
-7. aggiungi Modifica posizioni;
-8. aggiungi Chiudi mese come azione futura/inizialmente preparata.
+### C6 - Rifiniture Personalizzazione
+- delete sicuro;
+- ordinamento;
+- nascondi dal mese;
+- altre mancanze registrate.
 
-### P6 - Modifica pianificazione esistente
-1. precompila dati salvati;
-2. modifica risorse/allocazioni/opening/note;
-3. salvataggio atomico;
-4. protezione mese CLOSED.
-
-### P7 - Modifica posizioni esistenti
-1. precompila saldi correnti;
-2. permette aggiornamenti durante il mese;
-3. validazione totale;
-4. salvataggio atomico;
-5. prepara futura integrazione con movimenti espliciti.
-
-### P8 - Nascondi categoria dal mese
-1. decidere rappresentazione dati;
-2. UI per includi/nascondi;
-3. non alterare Personalizzazione;
-4. mantenere storico mensile.
-
-### P9 - Chiusura mese minima
-1. definire dati necessari al residuo finale;
-2. stato CLOSED;
-3. closedAt;
-4. blocco modifiche ordinarie;
-5. preparazione opening del mese successivo.
-
-La gestione completa di spese, movimenti e split dei residui puo' essere una milestone successiva, ma la chiusura minima deve avere semantica coerente prima di abilitare il mese successivo.
-
-### P10 - Navigazione mesi
-Solo dopo P1-P9:
-1. selettore precedente/successivo;
-2. storico;
-3. regole mesi futuri;
-4. gestione buchi/mesi non creati.
+### C7 - Audit dati per Analisi & Suggerimenti
+- riesame completo tabelle e flussi Casa;
+- aggiungere/modificare eventi e dati mancanti;
+- creare eventuali tabelle necessarie alla preservazione storica;
+- solo dopo questo punto considerare Casa definitivamente chiusa a livello di modello dati.
