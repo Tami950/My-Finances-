@@ -70,11 +70,17 @@ interface HouseMonthlyAllocationDao {
         SET categoryBehavior = :behavior,
             fixedExpensePaymentStatus = :paymentStatus,
             fixedExpensePlannedCents = CASE
-                WHEN :behavior = 'FIXED_EXPENSE' THEN COALESCE(:fixedExpensePlannedCents, openingBalanceCents + allocatedCents)
+                WHEN :behavior = 'FIXED_EXPENSE' THEN openingBalanceCents + allocatedCents
                 ELSE NULL
             END,
-            fixedExpensePrefundedCents = CASE WHEN :behavior = 'FIXED_EXPENSE' THEN fixedExpensePrefundedCents ELSE 0 END,
-            openingBalanceCents = CASE WHEN :behavior = 'FIXED_EXPENSE' THEN 0 ELSE openingBalanceCents END,
+            fixedExpensePrefundedCents = CASE
+                WHEN :behavior = 'FIXED_EXPENSE' THEN openingBalanceCents
+                ELSE 0
+            END,
+            openingBalanceCents = CASE
+                WHEN :behavior = 'FIXED_EXPENSE' THEN 0
+                ELSE fixedExpensePrefundedCents
+            END,
             updatedAt = :updatedAt
         WHERE categoryId = :categoryId
           AND houseMonthId IN (SELECT id FROM house_months WHERE status = 'OPEN')
@@ -84,27 +90,6 @@ interface HouseMonthlyAllocationDao {
         categoryId: Long,
         behavior: HouseCategoryBehavior,
         paymentStatus: FixedExpensePaymentStatus?,
-        fixedExpensePlannedCents: Long?,
-        updatedAt: Long
-    )
-
-    @Query(
-        """
-        UPDATE house_monthly_allocations
-        SET fixedExpensePlannedCents = :plannedCents,
-            allocatedCents = CASE
-                WHEN :plannedCents > fixedExpensePrefundedCents THEN :plannedCents - fixedExpensePrefundedCents
-                ELSE 0
-            END,
-            updatedAt = :updatedAt
-        WHERE categoryId = :categoryId
-          AND categoryBehavior = 'FIXED_EXPENSE'
-          AND houseMonthId IN (SELECT id FROM house_months WHERE status = 'OPEN')
-        """
-    )
-    suspend fun updateFixedExpensePlanForOpenMonths(
-        categoryId: Long,
-        plannedCents: Long,
         updatedAt: Long
     )
 
