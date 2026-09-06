@@ -19,6 +19,8 @@ data class HouseAllocationDetailsRow(
     val targetCents: Long?,
     val categoryBehavior: HouseCategoryBehavior,
     val fixedExpensePaymentStatus: FixedExpensePaymentStatus?,
+    val fixedExpensePlannedCents: Long?,
+    val fixedExpensePrefundedCents: Long,
     val openingBalanceCents: Long,
     val allocatedCents: Long
 )
@@ -41,6 +43,8 @@ interface HouseMonthlyAllocationDao {
             c.targetCents AS targetCents,
             a.categoryBehavior AS categoryBehavior,
             a.fixedExpensePaymentStatus AS fixedExpensePaymentStatus,
+            a.fixedExpensePlannedCents AS fixedExpensePlannedCents,
+            a.fixedExpensePrefundedCents AS fixedExpensePrefundedCents,
             a.openingBalanceCents AS openingBalanceCents,
             a.allocatedCents AS allocatedCents
         FROM house_monthly_allocations a
@@ -65,6 +69,12 @@ interface HouseMonthlyAllocationDao {
         UPDATE house_monthly_allocations
         SET categoryBehavior = :behavior,
             fixedExpensePaymentStatus = :paymentStatus,
+            fixedExpensePlannedCents = CASE
+                WHEN :behavior = 'FIXED_EXPENSE' THEN COALESCE(:fixedExpensePlannedCents, openingBalanceCents + allocatedCents)
+                ELSE NULL
+            END,
+            fixedExpensePrefundedCents = CASE WHEN :behavior = 'FIXED_EXPENSE' THEN fixedExpensePrefundedCents ELSE 0 END,
+            openingBalanceCents = CASE WHEN :behavior = 'FIXED_EXPENSE' THEN 0 ELSE openingBalanceCents END,
             updatedAt = :updatedAt
         WHERE categoryId = :categoryId
           AND houseMonthId IN (SELECT id FROM house_months WHERE status = 'OPEN')
@@ -74,6 +84,27 @@ interface HouseMonthlyAllocationDao {
         categoryId: Long,
         behavior: HouseCategoryBehavior,
         paymentStatus: FixedExpensePaymentStatus?,
+        fixedExpensePlannedCents: Long?,
+        updatedAt: Long
+    )
+
+    @Query(
+        """
+        UPDATE house_monthly_allocations
+        SET fixedExpensePlannedCents = :plannedCents,
+            allocatedCents = CASE
+                WHEN :plannedCents > fixedExpensePrefundedCents THEN :plannedCents - fixedExpensePrefundedCents
+                ELSE 0
+            END,
+            updatedAt = :updatedAt
+        WHERE categoryId = :categoryId
+          AND categoryBehavior = 'FIXED_EXPENSE'
+          AND houseMonthId IN (SELECT id FROM house_months WHERE status = 'OPEN')
+        """
+    )
+    suspend fun updateFixedExpensePlanForOpenMonths(
+        categoryId: Long,
+        plannedCents: Long,
         updatedAt: Long
     )
 
