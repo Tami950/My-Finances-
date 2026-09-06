@@ -34,7 +34,7 @@ import com.examplet.myfinances.data.entity.MoneyAccountEntity
         HouseMonthAvailableClosingTransferEntity::class,
         FixedExpensePendingEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
