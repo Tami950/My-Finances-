@@ -183,11 +183,34 @@ Regole:
 - CATEGORY richiede destinationCategoryId != null;
 - AVAILABLE richiede destinationCategoryId = null;
 - per ogni sourceCategoryId, somma transfer.amountCents = confirmedBalanceCents della relativa chiusura;
-- stessa sorgente e destinazione = "Mantieni";
+- stessa sorgente e destinazione = quota rimasta nella categoria;
+- per categorie attive la quota che resta nella sorgente e' calcolata automaticamente come confirmedBalanceCents - somma destinazioni esplicite;
 - split tra piu' destinazioni consentito;
 - nessun Fondo Casa separato nella versione corrente.
 
 La provenienza viene conservata per storico e futura Analisi & Suggerimenti.
+
+### 2.9 house_month_available_closing_transfers
+Tabella corrente che conserva le quote del Disponibile finale spostate esplicitamente verso categorie del mese successivo.
+
+Campi:
+- id: Long PK autoGenerate
+- houseMonthId: Long FK -> house_months CASCADE
+- destinationCategoryId: Long FK -> house_categories NO_ACTION
+- amountCents: Long
+- createdAt: Long
+
+Vincolo unico:
+- (houseMonthId, destinationCategoryId).
+
+Regole:
+- amountCents > 0 per le righe persistite;
+- la categoria destinazione deve essere attiva al momento della chiusura;
+- somma trasferimenti <= confirmedAvailableCents;
+- la differenza confirmedAvailableCents - somma trasferimenti resta automaticamente Disponibile;
+- nessuna riga viene creata per la quota che resta Disponibile, perche' e' derivabile dal closing del mese.
+
+Questa struttura mantiene distinta la provenienza dal Disponibile senza trasformarlo in una categoria fittizia.
 
 ## 3. Disponibile Casa
 `Disponibile` e' liquidita' Casa non vincolata ad alcuna categoria. Non e' una categoria fittizia e non deve obbligatoriamente essere allocato.
@@ -198,7 +221,11 @@ Prima dei movimenti:
 Con i movimenti:
 - availableCurrentCents = openingAvailableCents + nuove risorse - allocazioni - uscite dal Disponibile + entrate/rettifiche sul Disponibile.
 
-Il Disponibile finale confermato in chiusura viene riportato al mese successivo insieme agli eventuali transfer con destinationType=AVAILABLE.
+In chiusura:
+- il Disponibile confermato resta interamente Disponibile per default;
+- l'utente puo' spostarne una parte o tutto in una o piu' categorie;
+- keptAvailableCents = confirmedAvailableCents - somma house_month_available_closing_transfers.amountCents;
+- gli eventuali residui di categoria destinati ad AVAILABLE si aggiungono al Disponibile ereditato del mese successivo.
 
 ## 4. Stato mese e chiusura
 HouseMonthStatus e' persistito direttamente in house_months.
@@ -214,14 +241,14 @@ Se una validazione fallisce, la transazione viene annullata e il mese resta OPEN
 
 ## 5. Autocompletamento del mese successivo
 Per una categoria destinazione X:
-- suggestedOpening(X) = somma amountCents dei transfer del precedente CLOSED con destinationType=CATEGORY e destinationCategoryId=X.
+- suggestedOpening(X) = somma transfer CATEGORY provenienti dalle categorie + somma transfer provenienti dal Disponibile, tutti diretti a X nel precedente mese CLOSED.
 
 Se nessun transfer -> 0.
 
 Il valore suggerito resta modificabile.
 
 Per il Disponibile:
-- inheritedAvailable = confirmedAvailableCents della chiusura precedente + somma transfer con destinationType=AVAILABLE.
+- inheritedAvailable = confirmedAvailableCents - somma transfer dal Disponibile verso categorie + somma transfer di categoria con destinationType=AVAILABLE.
 
 Questo valore inizializza openingAvailableCents del nuovo mese e resta modificabile per riconciliare eventuali discrepanze reali.
 
@@ -293,11 +320,13 @@ Chiusura mese atomica:
 1. validare mese OPEN;
 2. ricalcolare i saldi calcolati dal repository;
 3. validare i saldi confermati;
-4. validare per ogni categoria somma transfer = confirmed balance;
-5. insert house_month_closings;
-6. insert house_month_category_closings;
-7. insert house_month_closing_transfers;
-8. update house_months status=CLOSED, closedAt=now, updatedAt=now.
+4. validare trasferimenti dal Disponibile: somma <= confirmedAvailableCents;
+5. validare per ogni categoria somma transfer persistiti = confirmed balance, includendo la quota automatica mantenuta nella sorgente;
+6. insert house_month_closings;
+7. insert house_month_available_closing_transfers;
+8. insert house_month_category_closings;
+9. insert house_month_closing_transfers;
+10. update house_months status=CLOSED, closedAt=now, updatedAt=now.
 
 ## 11. Invarianti di dominio
 - denaro mai negativo nei saldi confermati;
@@ -307,10 +336,13 @@ Chiusura mese atomica:
 - Disponibile ereditato separato dalle nuove risorse;
 - un mese CLOSED non viene modificato dai flussi ordinari;
 - mese successivo richiede precedente CLOSED quando esiste;
-- per ogni categoria chiusa: distribuito = confermato;
+- per una categoria attiva, se non vengono indicate destinazioni esplicite tutto il residuo resta nella stessa categoria;
+- la quota mantenuta nella categoria si riduce automaticamente quando si inseriscono altre destinazioni;
+- dal Disponibile non si puo' trasferire piu' del saldo confermato;
+- la quota di Disponibile non trasferita resta automaticamente Disponibile;
 - adjustment = confermato - calcolato;
-- transfer AVAILABLE non crea opening categoria;
-- transfer CATEGORY concorre all'opening suggerito del mese successivo;
+- transfer AVAILABLE di categoria non crea opening categoria;
+- transfer CATEGORY e transfer dal Disponibile concorrono all'opening suggerito del mese successivo;
 - i movimenti tra posizioni conservano il totale.
 
 ## 12. Preservazione dati per Analisi & Suggerimenti
@@ -324,6 +356,7 @@ Dati che non devono essere persi:
 - saldo confermato;
 - adjustment e nota;
 - trasferimenti di chiusura sorgente -> destinazione;
+- trasferimenti dal Disponibile verso categorie;
 - timestamp di chiusura;
 - movimenti fisici tra posizioni.
 
@@ -340,7 +373,7 @@ L'audit post-Casa dovra' verificare se servono:
 - eventuali versioni/snapshot delle definizioni categoria.
 
 ## 13. Migrazioni
-Database Room corrente: versione 6.
+Database Room corrente: versione 7.
 
 La versione 6 introduce:
 - house_months.openingAvailableCents NOT NULL DEFAULT 0;
@@ -349,9 +382,14 @@ La versione 6 introduce:
 - house_month_closing_transfers;
 - converter per HouseClosingDestinationType.
 
-E' presente una migrazione esplicita MIGRATION_5_6 che preserva i dati esistenti della versione 5.
+La versione 7 introduce:
+- house_month_available_closing_transfers.
 
-DatabaseModule registra MIGRATION_5_6 prima del fallback distruttivo. Il fallback resta temporaneamente disponibile soltanto per vecchi schemi di sviluppo non coperti da migrazioni.
+Sono presenti migrazioni esplicite:
+- MIGRATION_5_6;
+- MIGRATION_6_7.
+
+DatabaseModule registra entrambe prima del fallback distruttivo. Il fallback resta temporaneamente disponibile soltanto per vecchi schemi di sviluppo non coperti da migrazioni.
 
 Prima dell'uso reale:
 - rimuovere fallback distruttivo;
