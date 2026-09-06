@@ -51,7 +51,9 @@ fun CasaScreen(
                     onCreatePlan = onCreatePlan,
                     onEditPlan = onEditPlan,
                     onEditPositions = onEditPositions,
-                    onCloseMonth = onCloseMonth
+                    onCloseMonth = onCloseMonth,
+                    onSetFixedExpensePaid = viewModel::setFixedExpensePaid,
+                    onMarkPendingPaid = viewModel::markPendingFixedExpensePaid
                 )
 
                 CasaTab.CUSTOMIZATION -> HouseCustomizationContent(
@@ -77,6 +79,7 @@ fun CasaScreen(
             onNameChange = viewModel::updateCategoryDraftName,
             onTypeChange = viewModel::updateCategoryDraftType,
             onTargetChange = viewModel::updateCategoryDraftTarget,
+            onFixedExpenseChange = viewModel::updateCategoryDraftFixedExpense,
             onSave = viewModel::saveCategory,
             onDismiss = viewModel::dismissCategoryDialog
         )
