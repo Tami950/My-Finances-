@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.examplet.myfinances.R
 import com.examplet.myfinances.domain.model.HouseCategory
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 import com.examplet.myfinances.domain.model.MoneyAccount
 import com.examplet.myfinances.domain.model.MoneyAccountType
@@ -63,15 +65,19 @@ internal fun HouseCustomizationContent(
             item(key = "categories-empty") { Text(stringResource(R.string.house_categories_empty)) }
         }
         items(state.categories, key = { "category-${it.id}" }) { category ->
+            val typeLabel = when (category.type) {
+                HouseCategoryType.FLEXIBLE -> stringResource(R.string.house_category_type_flexible)
+                HouseCategoryType.TARGET -> stringResource(
+                    R.string.house_category_type_target,
+                    formatPlainCents(category.targetCents ?: 0)
+                )
+            }
+            val behaviorSuffix = if (category.behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                " · ${stringResource(R.string.house_category_fixed_expense_badge)}"
+            } else ""
             HouseManagerRow(
                 title = category.name,
-                subtitle = when (category.type) {
-                    HouseCategoryType.FLEXIBLE -> stringResource(R.string.house_category_type_flexible)
-                    HouseCategoryType.TARGET -> stringResource(
-                        R.string.house_category_type_target,
-                        formatPlainCents(category.targetCents ?: 0)
-                    )
-                },
+                subtitle = typeLabel + behaviorSuffix,
                 isArchived = category.isArchived,
                 onClick = { onEditCategory(category) },
                 onArchive = { onArchiveCategory(category.id) },
@@ -160,6 +166,7 @@ internal fun HouseCategorySheet(
     onNameChange: (String) -> Unit,
     onTypeChange: (HouseCategoryType) -> Unit,
     onTargetChange: (String) -> Unit,
+    onFixedExpenseChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -198,6 +205,24 @@ internal fun HouseCategorySheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onFixedExpenseChange(!draft.isFixedExpense) },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = draft.isFixedExpense,
+                onCheckedChange = onFixedExpenseChange
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.house_category_fixed_expense))
+                Text(
+                    stringResource(R.string.house_category_fixed_expense_help),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
         errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
