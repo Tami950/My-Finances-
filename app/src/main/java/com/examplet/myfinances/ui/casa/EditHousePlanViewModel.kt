@@ -21,10 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
-enum class HousePlanEditMode {
-    PLAN,
-    POSITIONS
-}
+enum class HousePlanEditMode { PLAN, POSITIONS }
 
 data class EditHousePlanCategoryUi(
     val id: Long,
@@ -34,14 +31,19 @@ data class EditHousePlanCategoryUi(
     val targetCents: Long?,
     val categoryBehavior: HouseCategoryBehavior,
     val fixedExpensePaymentStatus: FixedExpensePaymentStatus?,
+    val fixedExpensePlannedText: String = "",
+    val fixedExpensePrefundedCents: Long = 0,
     val openingBalanceText: String,
     val allocatedText: String
-)
+) {
+    val plannedFixedCents: Long get() = parseCentsOrZero(fixedExpensePlannedText)
+    val effectiveAllocatedCents: Long
+        get() = if (categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+            (plannedFixedCents - fixedExpensePrefundedCents).coerceAtLeast(0)
+        } else parseCentsOrZero(allocatedText)
+}
 
-data class EditHousePlanPositionUi(
-    val account: MoneyAccount,
-    val amountText: String
-)
+data class EditHousePlanPositionUi(val account: MoneyAccount, val amountText: String)
 
 data class EditHousePlanUiState(
     val houseMonthId: Long = 0,
@@ -63,47 +65,28 @@ data class EditHousePlanUiState(
     val isSaving: Boolean = false,
     val isSaved: Boolean = false
 ) {
-    val totalResourcesCents: Long
-        get() = parseCentsOrZero(totalResourcesText)
-
-    val openingAvailableCents: Long
-        get() = parseCentsOrZero(openingAvailableText)
-
-    val allocatedCents: Long
-        get() = categories.sumOf { parseCentsOrZero(it.allocatedText) }
-
-    val openingBalanceCents: Long
-        get() = categories.sumOf { parseCentsOrZero(it.openingBalanceText) }
-
-    val positionedCents: Long
-        get() = positions.sumOf { parseCentsOrZero(it.amountText) }
-
-    val availableCents: Long
-        get() = openingAvailableCents + totalResourcesCents - allocatedCents
-
+    val totalResourcesCents: Long get() = parseCentsOrZero(totalResourcesText)
+    val openingAvailableCents: Long get() = parseCentsOrZero(openingAvailableText)
+    val allocatedCents: Long get() = categories.sumOf { it.effectiveAllocatedCents }
+    val openingBalanceCents: Long get() = categories.filter { it.categoryBehavior == HouseCategoryBehavior.BUDGET }
+        .sumOf { parseCentsOrZero(it.openingBalanceText) }
+    val prefundedFixedExpensesCents: Long get() = categories.sumOf { it.fixedExpensePrefundedCents }
+    val positionedCents: Long get() = positions.sumOf { parseCentsOrZero(it.amountText) }
+    val availableCents: Long get() = openingAvailableCents + totalResourcesCents - allocatedCents
     val totalHouseFundsCents: Long
-        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents + pendingFixedExpensesCents
-
-    val unpositionedCents: Long
-        get() = totalHouseFundsCents - positionedCents
-
-    val allocationOverflowCents: Long
-        get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
-
-    val positionOverflowCents: Long
-        get() = (positionedCents - totalHouseFundsCents).coerceAtLeast(0)
-
-    val existingPositionOverflowCents: Long
-        get() = (currentPositionedCents - totalHouseFundsCents).coerceAtLeast(0)
-
-    val isClosed: Boolean
-        get() = status == HouseMonthStatus.CLOSED
-
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents + prefundedFixedExpensesCents + pendingFixedExpensesCents
+    val unpositionedCents: Long get() = totalHouseFundsCents - positionedCents
+    val allocationOverflowCents: Long get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
+    val positionOverflowCents: Long get() = (positionedCents - totalHouseFundsCents).coerceAtLeast(0)
+    val existingPositionOverflowCents: Long get() = (currentPositionedCents - totalHouseFundsCents).coerceAtLeast(0)
+    val isClosed: Boolean get() = status == HouseMonthStatus.CLOSED
+    val invalidFixedExpense: Boolean get() = categories.any {
+        it.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE &&
+            (it.plannedFixedCents <= 0 || it.fixedExpensePrefundedCents > it.plannedFixedCents)
+    }
     val canSave: Boolean
         get() = !isLoading && !isSaving && !isClosed && when (mode) {
-            HousePlanEditMode.PLAN ->
-                totalResourcesCents > 0 && allocationOverflowCents == 0L && existingPositionOverflowCents == 0L
-
+            HousePlanEditMode.PLAN -> allocationOverflowCents == 0L && existingPositionOverflowCents == 0L && !invalidFixedExpense
             HousePlanEditMode.POSITIONS -> positionOverflowCents == 0L
         }
 }
@@ -114,18 +97,9 @@ class EditHousePlanViewModel @Inject constructor(
     private val housePlanRepository: HousePlanRepository,
     moneyAccountRepository: MoneyAccountRepository
 ) : ViewModel() {
-
     private val houseMonthId: Long = requireNotNull(savedStateHandle["houseMonthId"])
-    private val mode: HousePlanEditMode = HousePlanEditMode.valueOf(
-        requireNotNull(savedStateHandle.get<String>("mode"))
-    )
-
-    private val _uiState = MutableStateFlow(
-        EditHousePlanUiState(
-            houseMonthId = houseMonthId,
-            mode = mode
-        )
-    )
+    private val mode: HousePlanEditMode = HousePlanEditMode.valueOf(requireNotNull(savedStateHandle.get<String>("mode")))
+    private val _uiState = MutableStateFlow(EditHousePlanUiState(houseMonthId = houseMonthId, mode = mode))
     val uiState: StateFlow<EditHousePlanUiState> = _uiState.asStateFlow()
 
     init {
@@ -138,7 +112,6 @@ class EditHousePlanViewModel @Inject constructor(
                     if (details == null) return@collect
                     val current = _uiState.value
                     val firstLoad = current.isLoading
-
                     val categoryDrafts = if (firstLoad) {
                         details.allocations.map { allocation ->
                             EditHousePlanCategoryUi(
@@ -149,6 +122,8 @@ class EditHousePlanViewModel @Inject constructor(
                                 targetCents = allocation.targetCents,
                                 categoryBehavior = allocation.categoryBehavior,
                                 fixedExpensePaymentStatus = allocation.fixedExpensePaymentStatus,
+                                fixedExpensePlannedText = allocation.fixedExpensePlannedCents?.let(::formatCentsForInput).orEmpty(),
+                                fixedExpensePrefundedCents = allocation.fixedExpensePrefundedCents,
                                 openingBalanceText = formatCentsForInput(allocation.openingBalanceCents),
                                 allocatedText = formatCentsForInput(allocation.allocatedCents)
                             )
@@ -156,33 +131,22 @@ class EditHousePlanViewModel @Inject constructor(
                     } else current.categories
 
                     val storedByAccount = details.accountBalances.associateBy { it.moneyAccountId }
-                    val relevantAccounts = accounts.filter { account ->
-                        !account.isArchived || storedByAccount.containsKey(account.id)
-                    }
+                    val relevantAccounts = accounts.filter { !it.isArchived || storedByAccount.containsKey(it.id) }
                     val previousPositions = current.positions.associateBy { it.account.id }
                     val positionDrafts = relevantAccounts.map { account ->
-                        if (!firstLoad && previousPositions[account.id] != null) {
-                            previousPositions.getValue(account.id).copy(account = account)
-                        } else {
-                            EditHousePlanPositionUi(
+                        previousPositions[account.id]?.takeIf { !firstLoad }?.copy(account = account)
+                            ?: EditHousePlanPositionUi(
                                 account = account,
-                                amountText = formatCentsForInput(
-                                    storedByAccount[account.id]?.amountCents ?: 0L
-                                )
+                                amountText = formatCentsForInput(storedByAccount[account.id]?.amountCents ?: 0L)
                             )
-                        }
                     }
 
                     _uiState.value = current.copy(
                         year = details.year,
                         month = details.month,
                         status = details.status,
-                        totalResourcesText = if (firstLoad) {
-                            formatCentsForInput(details.totalResourcesCents)
-                        } else current.totalResourcesText,
-                        openingAvailableText = if (firstLoad) {
-                            formatCentsForInput(details.openingAvailableCents)
-                        } else current.openingAvailableText,
+                        totalResourcesText = if (firstLoad) formatCentsForInput(details.totalResourcesCents) else current.totalResourcesText,
+                        openingAvailableText = if (firstLoad) formatCentsForInput(details.openingAvailableCents) else current.openingAvailableText,
                         pendingFixedExpensesCents = details.pendingFixedExpensesCents,
                         note = if (firstLoad) details.note.orEmpty() else current.note,
                         categories = categoryDrafts,
@@ -194,125 +158,85 @@ class EditHousePlanViewModel @Inject constructor(
         }
     }
 
-    fun updateTotalResources(value: String) {
-        _uiState.value = _uiState.value.copy(totalResourcesText = value, errorMessage = null)
-    }
-
-    fun updateOpeningAvailable(value: String) {
-        _uiState.value = _uiState.value.copy(openingAvailableText = value, errorMessage = null)
-    }
-
-    fun updateNote(value: String) {
-        _uiState.value = _uiState.value.copy(note = value, errorMessage = null)
-    }
-
-    fun openCategory(categoryId: Long) {
-        _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId, errorMessage = null)
-    }
-
-    fun dismissCategory() {
-        _uiState.value = _uiState.value.copy(selectedCategoryId = null, errorMessage = null)
-    }
-
+    fun updateTotalResources(value: String) { _uiState.value = _uiState.value.copy(totalResourcesText = value, errorMessage = null) }
+    fun updateOpeningAvailable(value: String) { _uiState.value = _uiState.value.copy(openingAvailableText = value, errorMessage = null) }
+    fun updateNote(value: String) { _uiState.value = _uiState.value.copy(note = value, errorMessage = null) }
+    fun openCategory(categoryId: Long) { _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId, errorMessage = null) }
+    fun dismissCategory() { _uiState.value = _uiState.value.copy(selectedCategoryId = null, errorMessage = null) }
     fun updateOpeningBalance(categoryId: Long, value: String) {
-        _uiState.value = _uiState.value.copy(
-            categories = _uiState.value.categories.map { row ->
-                if (row.categoryId == categoryId) row.copy(openingBalanceText = value) else row
-            },
-            errorMessage = null
-        )
+        _uiState.value = _uiState.value.copy(categories = _uiState.value.categories.map {
+            if (it.categoryId == categoryId) it.copy(openingBalanceText = value) else it
+        }, errorMessage = null)
     }
-
     fun updateAllocated(categoryId: Long, value: String) {
-        _uiState.value = _uiState.value.copy(
-            categories = _uiState.value.categories.map { row ->
-                if (row.categoryId == categoryId) row.copy(allocatedText = value) else row
-            },
-            errorMessage = null
-        )
+        _uiState.value = _uiState.value.copy(categories = _uiState.value.categories.map {
+            if (it.categoryId == categoryId) it.copy(allocatedText = value) else it
+        }, errorMessage = null)
     }
-
-    fun openAccount(accountId: Long) {
-        _uiState.value = _uiState.value.copy(selectedAccountId = accountId, errorMessage = null)
+    fun updateFixedExpensePlanned(categoryId: Long, value: String) {
+        _uiState.value = _uiState.value.copy(categories = _uiState.value.categories.map {
+            if (it.categoryId == categoryId) it.copy(fixedExpensePlannedText = value) else it
+        }, errorMessage = null)
     }
-
-    fun dismissAccount() {
-        _uiState.value = _uiState.value.copy(selectedAccountId = null, errorMessage = null)
-    }
-
+    fun openAccount(accountId: Long) { _uiState.value = _uiState.value.copy(selectedAccountId = accountId, errorMessage = null) }
+    fun dismissAccount() { _uiState.value = _uiState.value.copy(selectedAccountId = null, errorMessage = null) }
     fun updateAccountAmount(accountId: Long, value: String) {
-        _uiState.value = _uiState.value.copy(
-            positions = _uiState.value.positions.map { row ->
-                if (row.account.id == accountId) row.copy(amountText = value) else row
-            },
-            errorMessage = null
-        )
+        _uiState.value = _uiState.value.copy(positions = _uiState.value.positions.map {
+            if (it.account.id == accountId) it.copy(amountText = value) else it
+        }, errorMessage = null)
     }
 
     fun save() {
         val state = _uiState.value
         if (!state.canSave) return
-
         viewModelScope.launch {
             runCatching {
                 _uiState.value = state.copy(isSaving = true, errorMessage = null)
                 when (state.mode) {
-                    HousePlanEditMode.PLAN -> {
-                        val totalResources = parseEuroToCents(state.totalResourcesText, allowBlank = false)
-                        housePlanRepository.updatePlan(
-                            houseMonthId = state.houseMonthId,
-                            draft = HousePlanDraft(
-                                year = state.year,
-                                month = state.month,
-                                totalResourcesCents = totalResources,
-                                openingAvailableCents = parseEuroToCents(
-                                    state.openingAvailableText,
-                                    allowBlank = true
-                                ),
-                                note = state.note,
-                                allocations = state.categories.map { row ->
-                                    HousePlanAllocationDraft(
+                    HousePlanEditMode.PLAN -> housePlanRepository.updatePlan(
+                        houseMonthId = state.houseMonthId,
+                        draft = HousePlanDraft(
+                            year = state.year,
+                            month = state.month,
+                            totalResourcesCents = parseEuroToCents(state.totalResourcesText, allowBlank = true),
+                            openingAvailableCents = parseEuroToCents(state.openingAvailableText, allowBlank = true),
+                            note = state.note,
+                            allocations = state.categories.map { row ->
+                                when (row.categoryBehavior) {
+                                    HouseCategoryBehavior.BUDGET -> HousePlanAllocationDraft(
                                         categoryId = row.categoryId,
-                                        openingBalanceCents = parseEuroToCents(
-                                            row.openingBalanceText,
-                                            allowBlank = true
-                                        ),
-                                        allocatedCents = parseEuroToCents(
-                                            row.allocatedText,
-                                            allowBlank = true
-                                        ),
-                                        categoryBehavior = row.categoryBehavior,
-                                        fixedExpensePaymentStatus = row.fixedExpensePaymentStatus
+                                        openingBalanceCents = parseEuroToCents(row.openingBalanceText, allowBlank = true),
+                                        allocatedCents = parseEuroToCents(row.allocatedText, allowBlank = true),
+                                        categoryBehavior = HouseCategoryBehavior.BUDGET
                                     )
-                                },
-                                accountBalances = emptyList()
-                            )
+                                    HouseCategoryBehavior.FIXED_EXPENSE -> {
+                                        val planned = parseEuroToCents(row.fixedExpensePlannedText, allowBlank = false)
+                                        HousePlanAllocationDraft(
+                                            categoryId = row.categoryId,
+                                            openingBalanceCents = 0,
+                                            allocatedCents = planned - row.fixedExpensePrefundedCents,
+                                            categoryBehavior = HouseCategoryBehavior.FIXED_EXPENSE,
+                                            fixedExpensePaymentStatus = row.fixedExpensePaymentStatus,
+                                            fixedExpensePlannedCents = planned,
+                                            fixedExpensePrefundedCents = row.fixedExpensePrefundedCents
+                                        )
+                                    }
+                                }
+                            },
+                            accountBalances = emptyList()
                         )
-                    }
-
-                    HousePlanEditMode.POSITIONS -> {
-                        housePlanRepository.updatePositions(
-                            houseMonthId = state.houseMonthId,
-                            accountBalances = state.positions.map { row ->
-                                HousePlanAccountBalanceDraft(
-                                    moneyAccountId = row.account.id,
-                                    amountCents = parseEuroToCents(row.amountText, allowBlank = true)
-                                )
-                            }
-                        )
-                    }
+                    )
+                    HousePlanEditMode.POSITIONS -> housePlanRepository.updatePositions(
+                        houseMonthId = state.houseMonthId,
+                        accountBalances = state.positions.map {
+                            HousePlanAccountBalanceDraft(it.account.id, parseEuroToCents(it.amountText, allowBlank = true))
+                        }
+                    )
                 }
             }.onSuccess {
-                _uiState.value = _uiState.value.copy(
-                    isSaving = false,
-                    isSaved = true,
-                    errorMessage = null
-                )
+                _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true, errorMessage = null)
             }.onFailure { throwable ->
-                _uiState.value = _uiState.value.copy(
-                    isSaving = false,
-                    errorMessage = throwable.message ?: "Errore durante il salvataggio"
-                )
+                _uiState.value = _uiState.value.copy(isSaving = false, errorMessage = throwable.message ?: "Errore durante il salvataggio")
             }
         }
     }
