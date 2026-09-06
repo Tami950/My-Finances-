@@ -6,6 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.examplet.myfinances.data.entity.HouseMonthlyAllocationEntity
+import com.examplet.myfinances.domain.model.FixedExpensePaymentStatus
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 import kotlinx.coroutines.flow.Flow
 
@@ -15,6 +17,8 @@ data class HouseAllocationDetailsRow(
     val categoryName: String,
     val categoryType: HouseCategoryType,
     val targetCents: Long?,
+    val categoryBehavior: HouseCategoryBehavior,
+    val fixedExpensePaymentStatus: FixedExpensePaymentStatus?,
     val openingBalanceCents: Long,
     val allocatedCents: Long
 )
@@ -35,6 +39,8 @@ interface HouseMonthlyAllocationDao {
             c.name AS categoryName,
             c.type AS categoryType,
             c.targetCents AS targetCents,
+            a.categoryBehavior AS categoryBehavior,
+            a.fixedExpensePaymentStatus AS fixedExpensePaymentStatus,
             a.openingBalanceCents AS openingBalanceCents,
             a.allocatedCents AS allocatedCents
         FROM house_monthly_allocations a
@@ -53,4 +59,35 @@ interface HouseMonthlyAllocationDao {
 
     @Update
     suspend fun update(allocation: HouseMonthlyAllocationEntity)
+
+    @Query(
+        """
+        UPDATE house_monthly_allocations
+        SET categoryBehavior = :behavior,
+            fixedExpensePaymentStatus = :paymentStatus,
+            updatedAt = :updatedAt
+        WHERE categoryId = :categoryId
+          AND houseMonthId IN (SELECT id FROM house_months WHERE status = 'OPEN')
+        """
+    )
+    suspend fun updateBehaviorForOpenMonths(
+        categoryId: Long,
+        behavior: HouseCategoryBehavior,
+        paymentStatus: FixedExpensePaymentStatus?,
+        updatedAt: Long
+    )
+
+    @Query(
+        """
+        UPDATE house_monthly_allocations
+        SET fixedExpensePaymentStatus = :status, updatedAt = :updatedAt
+        WHERE houseMonthId = :houseMonthId AND categoryId = :categoryId
+        """
+    )
+    suspend fun updateFixedExpensePaymentStatus(
+        houseMonthId: Long,
+        categoryId: Long,
+        status: FixedExpensePaymentStatus,
+        updatedAt: Long
+    )
 }
