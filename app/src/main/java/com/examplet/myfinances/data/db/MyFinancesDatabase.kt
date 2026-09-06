@@ -5,11 +5,15 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.examplet.myfinances.data.dao.HouseCategoryDao
 import com.examplet.myfinances.data.dao.HouseMonthAccountBalanceDao
+import com.examplet.myfinances.data.dao.HouseMonthClosingDao
 import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.dao.MoneyAccountDao
 import com.examplet.myfinances.data.entity.HouseCategoryEntity
 import com.examplet.myfinances.data.entity.HouseMonthAccountBalanceEntity
+import com.examplet.myfinances.data.entity.HouseMonthCategoryClosingEntity
+import com.examplet.myfinances.data.entity.HouseMonthClosingEntity
+import com.examplet.myfinances.data.entity.HouseMonthClosingTransferEntity
 import com.examplet.myfinances.data.entity.HouseMonthEntity
 import com.examplet.myfinances.data.entity.HouseMonthlyAllocationEntity
 import com.examplet.myfinances.data.entity.MoneyAccountEntity
@@ -20,9 +24,12 @@ import com.examplet.myfinances.data.entity.MoneyAccountEntity
         HouseCategoryEntity::class,
         HouseMonthEntity::class,
         HouseMonthlyAllocationEntity::class,
-        HouseMonthAccountBalanceEntity::class
+        HouseMonthAccountBalanceEntity::class,
+        HouseMonthClosingEntity::class,
+        HouseMonthCategoryClosingEntity::class,
+        HouseMonthClosingTransferEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -32,4 +39,5 @@ abstract class MyFinancesDatabase : RoomDatabase() {
     abstract fun houseMonthDao(): HouseMonthDao
     abstract fun houseMonthlyAllocationDao(): HouseMonthlyAllocationDao
     abstract fun houseMonthAccountBalanceDao(): HouseMonthAccountBalanceDao
+    abstract fun houseMonthClosingDao(): HouseMonthClosingDao
 }
