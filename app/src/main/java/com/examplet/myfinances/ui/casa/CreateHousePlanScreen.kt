@@ -85,6 +85,18 @@ fun CreateHousePlanScreen(
                 )
             }
 
+            item(key = "opening-available") {
+                OutlinedTextField(
+                    value = state.openingAvailableText,
+                    onValueChange = viewModel::updateOpeningAvailable,
+                    label = { Text(stringResource(R.string.house_opening_available)) },
+                    supportingText = { Text(stringResource(R.string.house_opening_available_help)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             item(key = "note") {
                 OutlinedTextField(
                     value = state.note,
@@ -122,16 +134,14 @@ fun CreateHousePlanScreen(
                         )
                     }
                     Text(categoryDescription, style = MaterialTheme.typography.bodySmall)
-                    if (row.openingBalanceText.isNotBlank() || row.allocatedText.isNotBlank()) {
-                        Text(
-                            stringResource(
-                                R.string.house_plan_category_breakdown,
-                                formatCents(parseCentsOrZeroLocal(row.openingBalanceText)),
-                                formatCents(parseCentsOrZeroLocal(row.allocatedText))
-                            ),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+                    Text(
+                        stringResource(
+                            R.string.house_plan_category_breakdown,
+                            formatCents(parseCentsOrZeroLocal(row.openingBalanceText)),
+                            formatCents(parseCentsOrZeroLocal(row.allocatedText))
+                        ),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
 
@@ -146,13 +156,19 @@ fun CreateHousePlanScreen(
                         stringResource(R.string.house_summary_resources),
                         state.totalResourcesCents
                     )
+                    if (state.openingAvailableCents > 0) {
+                        SummaryRow(
+                            stringResource(R.string.house_summary_opening_available),
+                            state.openingAvailableCents
+                        )
+                    }
                     SummaryRow(
                         stringResource(R.string.house_summary_allocated),
                         state.allocatedCents
                     )
                     SummaryRow(
                         stringResource(R.string.house_summary_unallocated),
-                        state.unallocatedCents
+                        state.availableCents
                     )
                     if (state.openingBalanceCents > 0) {
                         SummaryRow(
@@ -160,6 +176,10 @@ fun CreateHousePlanScreen(
                             state.openingBalanceCents
                         )
                     }
+                    SummaryRow(
+                        stringResource(R.string.house_summary_total_funds),
+                        state.totalHouseFundsCents
+                    )
                     if (state.hasAllocationOverflow) {
                         Text(
                             stringResource(
