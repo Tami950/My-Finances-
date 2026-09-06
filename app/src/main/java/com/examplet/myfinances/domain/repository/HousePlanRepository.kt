@@ -11,25 +11,26 @@ import kotlinx.coroutines.flow.Flow
 
 interface HousePlanRepository {
     fun observeSummary(year: Int, month: Int): Flow<HousePlanSummary?>
-
     fun observeDetails(houseMonthId: Long): Flow<HousePlanDetails?>
-
     fun observePendingFixedExpenses(): Flow<List<FixedExpensePending>>
-
     suspend fun getCarryoverFor(year: Int, month: Int): HouseMonthCarryover
-
     suspend fun createPlan(draft: HousePlanDraft): Long
-
     suspend fun updatePlan(houseMonthId: Long, draft: HousePlanDraft)
-
-    suspend fun updatePositions(
-        houseMonthId: Long,
-        accountBalances: List<HousePlanAccountBalanceDraft>
-    )
-
+    suspend fun updatePositions(houseMonthId: Long, accountBalances: List<HousePlanAccountBalanceDraft>)
     suspend fun setFixedExpensePaid(houseMonthId: Long, categoryId: Long, isPaid: Boolean)
-
     suspend fun markPendingFixedExpensePaid(pendingId: Long)
+
+    /**
+     * Changes the planned amount of a FIXED_EXPENSE in an OPEN month while preserving
+     * the provenance of already-carried money. null source/destination means Disponibile.
+     */
+    suspend fun reallocateFixedExpensePlan(
+        houseMonthId: Long,
+        categoryId: Long,
+        newPlannedCents: Long,
+        sourceCategoryId: Long? = null,
+        destinationCategoryId: Long? = null
+    )
 
     suspend fun closeMonth(draft: HouseMonthClosingDraft)
 }
