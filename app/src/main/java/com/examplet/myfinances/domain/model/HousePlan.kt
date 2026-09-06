@@ -34,23 +34,15 @@ data class HousePlanDetails(
     val allocations: List<HousePlanAllocation>,
     val accountBalances: List<HousePlanAccountBalance>
 ) {
-    val allocatedCents: Long
-        get() = allocations.sumOf { it.allocatedCents }
-
-    val openingBalanceCents: Long
-        get() = allocations.sumOf { it.openingBalanceCents }
-
-    val positionedCents: Long
-        get() = accountBalances.sumOf { it.amountCents }
-
-    val availableCents: Long
-        get() = openingAvailableCents + totalResourcesCents - allocatedCents
-
+    val allocatedCents: Long get() = allocations.sumOf { it.allocatedCents }
+    val openingBalanceCents: Long get() = allocations.sumOf { it.openingBalanceCents }
+    val prefundedFixedExpensesCents: Long get() = allocations.sumOf { it.fixedExpensePrefundedCents }
+    val positionedCents: Long get() = accountBalances.sumOf { it.amountCents }
+    val availableCents: Long get() = openingAvailableCents + totalResourcesCents - allocatedCents
     val totalHouseFundsCents: Long
-        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents + pendingFixedExpensesCents
-
-    val unpositionedCents: Long
-        get() = totalHouseFundsCents - positionedCents
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents +
+            prefundedFixedExpensesCents + pendingFixedExpensesCents
+    val unpositionedCents: Long get() = totalHouseFundsCents - positionedCents
 }
 
 data class HousePlanAllocation(
@@ -61,11 +53,15 @@ data class HousePlanAllocation(
     val targetCents: Long?,
     val categoryBehavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
     val fixedExpensePaymentStatus: FixedExpensePaymentStatus? = null,
+    val fixedExpensePlannedCents: Long? = null,
+    val fixedExpensePrefundedCents: Long = 0,
     val openingBalanceCents: Long,
     val allocatedCents: Long
 ) {
     val totalAvailableCents: Long
-        get() = openingBalanceCents + allocatedCents
+        get() = if (categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+            fixedExpensePlannedCents ?: allocatedCents
+        } else openingBalanceCents + allocatedCents
 }
 
 data class HousePlanAccountBalance(
@@ -91,7 +87,9 @@ data class HousePlanAllocationDraft(
     val openingBalanceCents: Long,
     val allocatedCents: Long,
     val categoryBehavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
-    val fixedExpensePaymentStatus: FixedExpensePaymentStatus? = null
+    val fixedExpensePaymentStatus: FixedExpensePaymentStatus? = null,
+    val fixedExpensePlannedCents: Long? = null,
+    val fixedExpensePrefundedCents: Long = 0
 )
 
 data class HousePlanAccountBalanceDraft(
