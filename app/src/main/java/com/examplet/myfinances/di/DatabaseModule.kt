@@ -12,6 +12,7 @@ import com.examplet.myfinances.data.dao.MoneyAccountDao
 import com.examplet.myfinances.data.db.MIGRATION_5_6
 import com.examplet.myfinances.data.db.MIGRATION_6_7
 import com.examplet.myfinances.data.db.MIGRATION_7_8
+import com.examplet.myfinances.data.db.MIGRATION_8_9
 import com.examplet.myfinances.data.db.MyFinancesDatabase
 import dagger.Module
 import dagger.Provides
@@ -26,42 +27,17 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(
-        @ApplicationContext context: Context
-    ): MyFinancesDatabase = Room.databaseBuilder(
-        context,
-        MyFinancesDatabase::class.java,
-        "my_finances.db"
-    )
-        .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-        .fallbackToDestructiveMigration()
-        .build()
+    fun provideDatabase(@ApplicationContext context: Context): MyFinancesDatabase =
+        Room.databaseBuilder(context, MyFinancesDatabase::class.java, "my_finances.db")
+            .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+            .fallbackToDestructiveMigration()
+            .build()
 
-    @Provides
-    fun provideMoneyAccountDao(database: MyFinancesDatabase): MoneyAccountDao =
-        database.moneyAccountDao()
-
-    @Provides
-    fun provideHouseCategoryDao(database: MyFinancesDatabase): HouseCategoryDao =
-        database.houseCategoryDao()
-
-    @Provides
-    fun provideHouseMonthDao(database: MyFinancesDatabase): HouseMonthDao =
-        database.houseMonthDao()
-
-    @Provides
-    fun provideHouseMonthlyAllocationDao(database: MyFinancesDatabase): HouseMonthlyAllocationDao =
-        database.houseMonthlyAllocationDao()
-
-    @Provides
-    fun provideHouseMonthAccountBalanceDao(database: MyFinancesDatabase): HouseMonthAccountBalanceDao =
-        database.houseMonthAccountBalanceDao()
-
-    @Provides
-    fun provideHouseMonthClosingDao(database: MyFinancesDatabase): HouseMonthClosingDao =
-        database.houseMonthClosingDao()
-
-    @Provides
-    fun provideFixedExpensePendingDao(database: MyFinancesDatabase): FixedExpensePendingDao =
-        database.fixedExpensePendingDao()
+    @Provides fun provideMoneyAccountDao(database: MyFinancesDatabase): MoneyAccountDao = database.moneyAccountDao()
+    @Provides fun provideHouseCategoryDao(database: MyFinancesDatabase): HouseCategoryDao = database.houseCategoryDao()
+    @Provides fun provideHouseMonthDao(database: MyFinancesDatabase): HouseMonthDao = database.houseMonthDao()
+    @Provides fun provideHouseMonthlyAllocationDao(database: MyFinancesDatabase): HouseMonthlyAllocationDao = database.houseMonthlyAllocationDao()
+    @Provides fun provideHouseMonthAccountBalanceDao(database: MyFinancesDatabase): HouseMonthAccountBalanceDao = database.houseMonthAccountBalanceDao()
+    @Provides fun provideHouseMonthClosingDao(database: MyFinancesDatabase): HouseMonthClosingDao = database.houseMonthClosingDao()
+    @Provides fun provideFixedExpensePendingDao(database: MyFinancesDatabase): FixedExpensePendingDao = database.fixedExpensePendingDao()
 }
