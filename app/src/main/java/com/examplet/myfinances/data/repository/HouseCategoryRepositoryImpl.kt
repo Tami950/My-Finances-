@@ -1,16 +1,20 @@
 package com.examplet.myfinances.data.repository
 
 import com.examplet.myfinances.data.dao.HouseCategoryDao
+import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.entity.HouseCategoryEntity
+import com.examplet.myfinances.domain.model.FixedExpensePaymentStatus
 import com.examplet.myfinances.domain.model.HouseCategory
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 import com.examplet.myfinances.domain.repository.HouseCategoryRepository
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
 
 class HouseCategoryRepositoryImpl @Inject constructor(
-    private val houseCategoryDao: HouseCategoryDao
+    private val houseCategoryDao: HouseCategoryDao,
+    private val allocationDao: HouseMonthlyAllocationDao
 ) : HouseCategoryRepository {
 
     override fun observeCategories(includeArchived: Boolean): Flow<List<HouseCategory>> =
@@ -22,6 +26,7 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         name: String,
         type: HouseCategoryType,
         targetCents: Long?,
+        behavior: HouseCategoryBehavior,
         sortOrder: Int
     ): Long {
         val normalizedName = name.trim()
@@ -37,6 +42,7 @@ class HouseCategoryRepositoryImpl @Inject constructor(
                 name = normalizedName,
                 type = type,
                 targetCents = normalizedTarget(type, targetCents),
+                behavior = behavior,
                 sortOrder = sortOrder,
                 createdAt = now,
                 updatedAt = now
@@ -48,7 +54,8 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         id: Long,
         name: String,
         type: HouseCategoryType,
-        targetCents: Long?
+        targetCents: Long?,
+        behavior: HouseCategoryBehavior
     ) {
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Il nome della categoria non può essere vuoto" }
@@ -58,13 +65,26 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         validateTarget(type, targetCents)
 
         val current = requireNotNull(houseCategoryDao.getById(id)) { "Categoria non trovata" }
+        val now = System.currentTimeMillis()
         houseCategoryDao.update(
             current.copy(
                 name = normalizedName,
                 type = type,
                 targetCents = normalizedTarget(type, targetCents),
-                updatedAt = System.currentTimeMillis()
+                behavior = behavior,
+                updatedAt = now
             )
+        )
+
+        // An OPEN month is still editable. Keep its behavior snapshot aligned so a category
+        // converted to fixed expense can be tested/used immediately in the current month.
+        allocationDao.updateBehaviorForOpenMonths(
+            categoryId = id,
+            behavior = behavior,
+            paymentStatus = if (behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                FixedExpensePaymentStatus.PLANNED
+            } else null,
+            updatedAt = now
         )
     }
 
@@ -89,6 +109,7 @@ private fun HouseCategoryEntity.toDomain() = HouseCategory(
     name = name,
     type = type,
     targetCents = targetCents,
+    behavior = behavior,
     sortOrder = sortOrder,
     isArchived = isArchived
 )
