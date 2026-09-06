@@ -19,6 +19,15 @@ interface HouseCategoryDao {
     )
     fun observeCategories(includeArchived: Boolean = false): Flow<List<HouseCategoryEntity>>
 
+    @Query(
+        """
+        SELECT * FROM house_categories
+        WHERE isArchived = 0
+        ORDER BY sortOrder ASC, name COLLATE NOCASE ASC
+        """
+    )
+    suspend fun getActiveCategories(): List<HouseCategoryEntity>
+
     @Query("SELECT * FROM house_categories WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): HouseCategoryEntity?
 
