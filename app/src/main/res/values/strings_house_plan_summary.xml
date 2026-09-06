@@ -1,0 +1,7 @@
+<resources>
+    <string name="house_summary_month_planning">Pianificazione del mese</string>
+    <string name="house_summary_free_initial">Risorse libere iniziali</string>
+    <string name="house_summary_new_allocations">Nuove allocazioni</string>
+    <string name="house_summary_already_bound">Già vincolato da mesi precedenti</string>
+    <string name="house_summary_bound_total">Totale già vincolato</string>
+</resources>
