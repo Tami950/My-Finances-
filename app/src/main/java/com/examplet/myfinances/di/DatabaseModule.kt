@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.examplet.myfinances.data.dao.HouseCategoryDao
 import com.examplet.myfinances.data.dao.HouseMonthAccountBalanceDao
+import com.examplet.myfinances.data.dao.HouseMonthClosingDao
 import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.dao.MoneyAccountDao
@@ -52,4 +53,8 @@ object DatabaseModule {
     @Provides
     fun provideHouseMonthAccountBalanceDao(database: MyFinancesDatabase): HouseMonthAccountBalanceDao =
         database.houseMonthAccountBalanceDao()
+
+    @Provides
+    fun provideHouseMonthClosingDao(database: MyFinancesDatabase): HouseMonthClosingDao =
+        database.houseMonthClosingDao()
 }
