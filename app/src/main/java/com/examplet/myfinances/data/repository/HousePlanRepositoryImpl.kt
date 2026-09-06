@@ -66,8 +66,9 @@ class HousePlanRepositoryImpl @Inject constructor(
     override fun observeDetails(houseMonthId: Long): Flow<HousePlanDetails?> = combine(
         houseMonthDao.observeById(houseMonthId),
         allocationDao.observeDetailsForMonth(houseMonthId),
-        accountBalanceDao.observeDetailsForMonth(houseMonthId)
-    ) { month, allocations, balances ->
+        accountBalanceDao.observeDetailsForMonth(houseMonthId),
+        pendingDao.observePendingTotalCents()
+    ) { month, allocations, balances, pendingTotalCents ->
         month?.let {
             HousePlanDetails(
                 id = it.id,
@@ -75,6 +76,7 @@ class HousePlanRepositoryImpl @Inject constructor(
                 month = it.month,
                 totalResourcesCents = it.totalResourcesCents,
                 openingAvailableCents = it.openingAvailableCents,
+                pendingFixedExpensesCents = pendingTotalCents,
                 note = it.note,
                 status = it.status,
                 closedAt = it.closedAt,
@@ -160,10 +162,14 @@ class HousePlanRepositoryImpl @Inject constructor(
     }
 
     override suspend fun createPlan(draft: HousePlanDraft): Long {
-        validateDraft(draft)
+        validateDraft(draft, validatePositions = false)
 
         return database.withTransaction {
             requirePreviousMonthClosed(draft.year, draft.month)
+            validatePositionDraft(
+                draft = draft,
+                pendingFixedExpensesCents = pendingDao.getPendingTotalCents()
+            )
 
             val now = System.currentTimeMillis()
             val houseMonthId = houseMonthDao.insert(
@@ -225,7 +231,10 @@ class HousePlanRepositoryImpl @Inject constructor(
             val currentPositioned = accountBalanceDao
                 .getForMonth(houseMonthId)
                 .sumOf { it.amountCents }
-            val newTotalHouseFunds = totalHouseFundsCents(draft)
+            val newTotalHouseFunds = totalHouseFundsCents(
+                draft = draft,
+                pendingFixedExpensesCents = pendingDao.getPendingTotalCents()
+            )
             require(currentPositioned <= newTotalHouseFunds) {
                 "Le posizioni attuali superano i fondi Casa risultanti"
             }
@@ -272,7 +281,10 @@ class HousePlanRepositoryImpl @Inject constructor(
                 .getForMonth(houseMonthId)
                 .sumOf { it.openingBalanceCents }
             val totalHouseFunds =
-                month.totalResourcesCents + month.openingAvailableCents + openingCategories
+                month.totalResourcesCents +
+                    month.openingAvailableCents +
+                    openingCategories +
+                    pendingDao.getPendingTotalCents()
             val positioned = accountBalances.sumOf { it.amountCents }
             require(positioned <= totalHouseFunds) {
                 "Le posizioni del denaro superano i fondi Casa complessivi"
@@ -602,23 +614,34 @@ class HousePlanRepositoryImpl @Inject constructor(
         }
 
         if (validatePositions) {
-            require(draft.accountBalances.isNotEmpty()) {
-                "Serve almeno una posizione del denaro disponibile"
-            }
-            require(draft.accountBalances.all { it.amountCents >= 0 }) {
-                "Le posizioni del denaro non possono essere negative"
-            }
-            val positionedCents = draft.accountBalances.sumOf { it.amountCents }
-            require(positionedCents <= totalHouseFundsCents(draft)) {
-                "Le posizioni del denaro superano i fondi Casa complessivi"
-            }
+            validatePositionDraft(draft = draft, pendingFixedExpensesCents = 0)
         }
     }
 
-    private fun totalHouseFundsCents(draft: HousePlanDraft): Long =
+    private fun validatePositionDraft(
+        draft: HousePlanDraft,
+        pendingFixedExpensesCents: Long
+    ) {
+        require(draft.accountBalances.isNotEmpty()) {
+            "Serve almeno una posizione del denaro disponibile"
+        }
+        require(draft.accountBalances.all { it.amountCents >= 0 }) {
+            "Le posizioni del denaro non possono essere negative"
+        }
+        val positionedCents = draft.accountBalances.sumOf { it.amountCents }
+        require(positionedCents <= totalHouseFundsCents(draft, pendingFixedExpensesCents)) {
+            "Le posizioni del denaro superano i fondi Casa complessivi"
+        }
+    }
+
+    private fun totalHouseFundsCents(
+        draft: HousePlanDraft,
+        pendingFixedExpensesCents: Long = 0
+    ): Long =
         draft.totalResourcesCents +
             draft.openingAvailableCents +
-            draft.allocations.sumOf { it.openingBalanceCents }
+            draft.allocations.sumOf { it.openingBalanceCents } +
+            pendingFixedExpensesCents
 
     private fun previousMonthOf(year: Int, month: Int): Pair<Int, Int> =
         if (month == 1) (year - 1) to 12 else year to (month - 1)
