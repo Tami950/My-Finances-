@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 
 @Entity(
@@ -17,6 +18,8 @@ data class HouseCategoryEntity(
     val name: String,
     val type: HouseCategoryType = HouseCategoryType.FLEXIBLE,
     val targetCents: Long? = null,
+    @ColumnInfo(defaultValue = "'BUDGET'")
+    val behavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
     val sortOrder: Int = 0,
     val isArchived: Boolean = false,
     val createdAt: Long,
