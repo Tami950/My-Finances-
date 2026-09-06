@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.examplet.myfinances.R
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 import com.examplet.myfinances.ui.components.AppModalBottomSheet
 import com.examplet.myfinances.ui.components.AppScreen
@@ -56,18 +58,10 @@ fun CreateHousePlanScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "header") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.action_back))
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }
                     Text(
-                        text = stringResource(
-                            R.string.house_create_plan_title,
-                            monthLabel(state.month, state.year)
-                        ),
+                        stringResource(R.string.house_create_plan_title, monthLabel(state.month, state.year)),
                         style = MaterialTheme.typography.titleLarge
                     )
                 }
@@ -78,6 +72,7 @@ fun CreateHousePlanScreen(
                     value = state.totalResourcesText,
                     onValueChange = viewModel::updateTotalResources,
                     label = { Text(stringResource(R.string.house_month_resources)) },
+                    supportingText = { Text(stringResource(R.string.house_month_resources_prefill_help)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -106,10 +101,7 @@ fun CreateHousePlanScreen(
             }
 
             item(key = "categories-title") {
-                Text(
-                    stringResource(R.string.house_plan_categories_title),
-                    style = MaterialTheme.typography.titleLarge
-                )
+                Text(stringResource(R.string.house_plan_categories_title), style = MaterialTheme.typography.titleLarge)
             }
 
             items(state.categories, key = { "plan-category-${it.category.id}" }) { row ->
@@ -120,77 +112,67 @@ fun CreateHousePlanScreen(
                         .padding(vertical = 8.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        Text(row.category.name, modifier = Modifier.weight(1f))
-                        Text(formatCents(rowTotalCents(row)))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(row.category.name)
+                            if (row.category.behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                                Text(stringResource(R.string.house_category_fixed_expense_badge), style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Text(formatCents(row.totalDisplayCents))
                     }
-                    val categoryDescription = when (row.category.type) {
-                        HouseCategoryType.FLEXIBLE ->
-                            stringResource(R.string.house_category_type_flexible)
-
-                        HouseCategoryType.TARGET -> stringResource(
-                            R.string.house_category_type_target,
-                            formatPlainCents(row.category.targetCents ?: 0)
+                    if (row.category.behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                        Text(
+                            stringResource(
+                                R.string.house_fixed_expense_plan_breakdown,
+                                formatCents(row.fixedExpensePrefundedCents),
+                                formatCents(row.effectiveAllocatedCents)
+                            ),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        val categoryDescription = when (row.category.type) {
+                            HouseCategoryType.FLEXIBLE -> stringResource(R.string.house_category_type_flexible)
+                            HouseCategoryType.TARGET -> stringResource(
+                                R.string.house_category_type_target,
+                                formatPlainCents(row.category.targetCents ?: 0)
+                            )
+                        }
+                        Text(categoryDescription, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            stringResource(
+                                R.string.house_plan_category_breakdown,
+                                formatCents(parseCentsOrZeroLocal(row.openingBalanceText)),
+                                formatCents(parseCentsOrZeroLocal(row.allocatedText))
+                            ),
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    Text(categoryDescription, style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        stringResource(
-                            R.string.house_plan_category_breakdown,
-                            formatCents(parseCentsOrZeroLocal(row.openingBalanceText)),
-                            formatCents(parseCentsOrZeroLocal(row.allocatedText))
-                        ),
-                        style = MaterialTheme.typography.bodySmall
-                    )
                 }
             }
 
             item(key = "summary-divider") { HorizontalDivider() }
             item(key = "summary") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        stringResource(R.string.house_plan_summary),
-                        style = MaterialTheme.typography.titleMedium
+                    Text(stringResource(R.string.house_plan_summary), style = MaterialTheme.typography.titleMedium)
+                    SummaryRow(stringResource(R.string.house_summary_resources), state.totalResourcesCents)
+                    if (state.openingAvailableCents > 0) SummaryRow(
+                        stringResource(R.string.house_summary_opening_available), state.openingAvailableCents
                     )
-                    SummaryRow(
-                        stringResource(R.string.house_summary_resources),
-                        state.totalResourcesCents
+                    SummaryRow(stringResource(R.string.house_summary_allocated), state.allocatedCents)
+                    SummaryRow(stringResource(R.string.house_summary_unallocated), state.availableCents)
+                    if (state.openingBalanceCents > 0) SummaryRow(
+                        stringResource(R.string.house_summary_opening), state.openingBalanceCents
                     )
-                    if (state.openingAvailableCents > 0) {
-                        SummaryRow(
-                            stringResource(R.string.house_summary_opening_available),
-                            state.openingAvailableCents
-                        )
-                    }
-                    SummaryRow(
-                        stringResource(R.string.house_summary_allocated),
-                        state.allocatedCents
+                    if (state.prefundedFixedExpensesCents > 0) SummaryRow(
+                        stringResource(R.string.house_summary_prefunded_fixed), state.prefundedFixedExpensesCents
                     )
-                    SummaryRow(
-                        stringResource(R.string.house_summary_unallocated),
-                        state.availableCents
+                    if (state.pendingFixedExpensesCents > 0) SummaryRow(
+                        stringResource(R.string.house_summary_pending_fixed), state.pendingFixedExpensesCents
                     )
-                    if (state.openingBalanceCents > 0) {
-                        SummaryRow(
-                            stringResource(R.string.house_summary_opening),
-                            state.openingBalanceCents
-                        )
-                    }
-                    if (state.pendingFixedExpensesCents > 0) {
-                        SummaryRow(
-                            stringResource(R.string.house_summary_pending_fixed),
-                            state.pendingFixedExpensesCents
-                        )
-                    }
-                    SummaryRow(
-                        stringResource(R.string.house_summary_total_funds),
-                        state.totalHouseFundsCents
-                    )
+                    SummaryRow(stringResource(R.string.house_summary_total_funds), state.totalHouseFundsCents)
                     if (state.hasAllocationOverflow) {
                         Text(
-                            stringResource(
-                                R.string.house_allocation_overflow_error,
-                                formatCents(state.allocationOverflowCents)
-                            ),
+                            stringResource(R.string.house_allocation_overflow_error, formatCents(state.allocationOverflowCents)),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -200,14 +182,8 @@ fun CreateHousePlanScreen(
 
             item(key = "accounts-title") {
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.house_plan_accounts_title),
-                    style = MaterialTheme.typography.titleLarge
-                )
-                Text(
-                    stringResource(R.string.house_positions_current_help),
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(stringResource(R.string.house_plan_accounts_title), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.house_positions_current_help), style = MaterialTheme.typography.bodySmall)
             }
 
             items(state.accounts, key = { "plan-account-${it.account.id}" }) { row ->
@@ -225,20 +201,11 @@ fun CreateHousePlanScreen(
 
             item(key = "position-summary") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    SummaryRow(
-                        stringResource(R.string.house_summary_positioned),
-                        state.positionedCents
-                    )
-                    SummaryRow(
-                        stringResource(R.string.house_summary_unpositioned),
-                        state.unpositionedCents
-                    )
+                    SummaryRow(stringResource(R.string.house_summary_positioned), state.positionedCents)
+                    SummaryRow(stringResource(R.string.house_summary_unpositioned), state.unpositionedCents)
                     if (state.hasPositionOverflow) {
                         Text(
-                            stringResource(
-                                R.string.house_position_overflow_error,
-                                formatCents(state.positionOverflowCents)
-                            ),
+                            stringResource(R.string.house_position_overflow_error, formatCents(state.positionOverflowCents)),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -246,90 +213,90 @@ fun CreateHousePlanScreen(
                 }
             }
 
-            state.errorMessage?.let { error ->
-                item(key = "error") {
-                    Text(error, color = MaterialTheme.colorScheme.error)
-                }
-            }
+            state.errorMessage?.let { error -> item(key = "error") { Text(error, color = MaterialTheme.colorScheme.error) } }
 
             item(key = "save") {
                 Button(
-                    onClick = viewModel::savePlan,
+                    onClick = viewModel::requestSavePlan,
                     enabled = state.canSave,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        stringResource(
-                            if (state.isSaving) R.string.action_saving
-                            else R.string.house_save_plan
-                        )
-                    )
+                    Text(stringResource(if (state.isSaving) R.string.action_saving else R.string.house_save_plan))
                 }
             }
         }
     }
 
-    val selectedCategory = state.categories.firstOrNull {
-        it.category.id == state.selectedCategoryId
-    }
+    val selectedCategory = state.categories.firstOrNull { it.category.id == state.selectedCategoryId }
     selectedCategory?.let { row ->
         AppModalBottomSheet(
             onDismissRequest = viewModel::dismissCategory,
-            title = {
-                Text(row.category.name, style = MaterialTheme.typography.titleLarge)
-            },
+            title = { Text(row.category.name, style = MaterialTheme.typography.titleLarge) },
             actions = {
-                Button(onClick = viewModel::dismissCategory) {
-                    Text(stringResource(R.string.action_done))
-                }
+                Button(
+                    onClick = viewModel::dismissCategory,
+                    enabled = when (row.category.behavior) {
+                        HouseCategoryBehavior.BUDGET -> true
+                        HouseCategoryBehavior.FIXED_EXPENSE ->
+                            row.fixedExpensePlannedCents > 0 && row.fixedExpensePrefundedCents <= row.fixedExpensePlannedCents
+                    }
+                ) { Text(stringResource(R.string.action_done)) }
             }
         ) {
-            OutlinedTextField(
-                value = row.openingBalanceText,
-                onValueChange = { viewModel.updateOpeningBalance(row.category.id, it) },
-                label = { Text(stringResource(R.string.house_opening_balance)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = row.allocatedText,
-                onValueChange = { viewModel.updateAllocated(row.category.id, it) },
-                label = { Text(stringResource(R.string.house_new_allocation)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            SummaryRow(
-                stringResource(R.string.house_category_total),
-                rowTotalCents(row)
-            )
-            if (state.hasAllocationOverflow) {
-                Text(
-                    stringResource(
-                        R.string.house_allocation_overflow_error,
-                        formatCents(state.allocationOverflowCents)
-                    ),
-                    color = MaterialTheme.colorScheme.error
+            if (row.category.behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                OutlinedTextField(
+                    value = row.fixedExpensePlannedText,
+                    onValueChange = { viewModel.updateFixedExpensePlanned(row.category.id, it) },
+                    label = { Text(stringResource(R.string.house_fixed_expense_planned)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
+                SummaryRow(stringResource(R.string.house_fixed_expense_prefunded), row.fixedExpensePrefundedCents)
+                SummaryRow(stringResource(R.string.house_fixed_expense_from_new_resources), row.effectiveAllocatedCents)
+                if (row.fixedExpensePrefundedCents > row.fixedExpensePlannedCents) {
+                    Text(stringResource(R.string.house_fixed_expense_prefunded_overflow), color = MaterialTheme.colorScheme.error)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.updateUseAsNewDefault(row.category.id, !row.useAsNewFixedExpenseDefault) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = row.useAsNewFixedExpenseDefault,
+                        onCheckedChange = { viewModel.updateUseAsNewDefault(row.category.id, it) }
+                    )
+                    Text(stringResource(R.string.house_fixed_expense_use_as_default))
+                }
+            } else {
+                OutlinedTextField(
+                    value = row.openingBalanceText,
+                    onValueChange = { viewModel.updateOpeningBalance(row.category.id, it) },
+                    label = { Text(stringResource(R.string.house_opening_balance)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = row.allocatedText,
+                    onValueChange = { viewModel.updateAllocated(row.category.id, it) },
+                    label = { Text(stringResource(R.string.house_new_allocation)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                SummaryRow(stringResource(R.string.house_category_total), row.totalDisplayCents)
             }
         }
     }
 
-    val selectedAccount = state.accounts.firstOrNull {
-        it.account.id == state.selectedAccountId
-    }
+    val selectedAccount = state.accounts.firstOrNull { it.account.id == state.selectedAccountId }
     selectedAccount?.let { row ->
         AppModalBottomSheet(
             onDismissRequest = viewModel::dismissAccount,
-            title = {
-                Text(row.account.name, style = MaterialTheme.typography.titleLarge)
-            },
-            actions = {
-                Button(onClick = viewModel::dismissAccount) {
-                    Text(stringResource(R.string.action_done))
-                }
-            }
+            title = { Text(row.account.name, style = MaterialTheme.typography.titleLarge) },
+            actions = { Button(onClick = viewModel::dismissAccount) { Text(stringResource(R.string.action_done)) } }
         ) {
             OutlinedTextField(
                 value = row.amountText,
@@ -339,15 +306,19 @@ fun CreateHousePlanScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            if (state.hasPositionOverflow) {
-                Text(
-                    stringResource(
-                        R.string.house_position_overflow_error,
-                        formatCents(state.positionOverflowCents)
-                    ),
-                    color = MaterialTheme.colorScheme.error
-                )
+        }
+    }
+
+    if (state.showDefaultUpdateConfirmation) {
+        AppModalBottomSheet(
+            onDismissRequest = viewModel::dismissDefaultUpdateConfirmation,
+            title = { Text(stringResource(R.string.house_fixed_expense_default_confirm_title), style = MaterialTheme.typography.titleLarge) },
+            actions = {
+                TextButton(onClick = viewModel::dismissDefaultUpdateConfirmation) { Text(stringResource(R.string.action_cancel)) }
+                Button(onClick = viewModel::confirmSaveAndUpdateDefaults) { Text(stringResource(R.string.action_confirm)) }
             }
+        ) {
+            Text(stringResource(R.string.house_fixed_expense_default_confirm_description))
         }
     }
 }
@@ -365,23 +336,14 @@ internal fun monthLabel(month: Int, year: Int): String {
     return "${monthName.replaceFirstChar { it.uppercase() }} $year"
 }
 
-private fun rowTotalCents(row: HousePlanCategoryDraftUi): Long =
-    parseCentsOrZeroLocal(row.openingBalanceText) +
-        parseCentsOrZeroLocal(row.allocatedText)
-
 private fun parseCentsOrZeroLocal(value: String): Long = runCatching {
     val normalized = value.trim().replace(',', '.')
     if (normalized.isEmpty()) return@runCatching 0L
-    normalized.toBigDecimal()
-        .setScale(2)
-        .movePointRight(2)
-        .longValueExact()
+    normalized.toBigDecimal().setScale(2).movePointRight(2).longValueExact()
 }.getOrDefault(0L)
 
-internal fun formatHouseCents(cents: Long): String {
-    val formatter = NumberFormat.getCurrencyInstance(Locale.ITALY)
-    return formatter.format(BigDecimal(cents).movePointLeft(2))
-}
+internal fun formatHouseCents(cents: Long): String =
+    NumberFormat.getCurrencyInstance(Locale.ITALY).format(BigDecimal(cents).movePointLeft(2))
 
 private fun formatCents(cents: Long): String = formatHouseCents(cents)
 
