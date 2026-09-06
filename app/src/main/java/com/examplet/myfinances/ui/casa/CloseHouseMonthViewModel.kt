@@ -3,6 +3,7 @@ package com.examplet.myfinances.ui.casa
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.examplet.myfinances.domain.model.HouseAvailableClosingTransferDraft
 import com.examplet.myfinances.domain.model.HouseCategory
 import com.examplet.myfinances.domain.model.HouseCategoryClosingDraft
 import com.examplet.myfinances.domain.model.HouseClosingDestinationType
@@ -26,18 +27,25 @@ data class HouseClosingDestinationUi(
     val amountText: String = ""
 )
 
+data class HouseAvailableClosingDestinationUi(
+    val categoryId: Long,
+    val label: String,
+    val amountText: String = ""
+)
+
 data class HouseCategoryClosingUi(
     val categoryId: Long,
     val categoryName: String,
     val calculatedBalanceCents: Long,
     val confirmedBalanceText: String,
     val adjustmentNote: String = "",
+    val canKeepInSource: Boolean,
     val destinations: List<HouseClosingDestinationUi>
 ) {
     val confirmedBalanceCents: Long?
         get() = parseClosingCentsOrNull(confirmedBalanceText, allowBlank = false)
 
-    val distributedCents: Long?
+    val explicitlyDistributedCents: Long?
         get() {
             val values = destinations.map {
                 parseClosingCentsOrNull(it.amountText, allowBlank = true)
@@ -46,18 +54,44 @@ data class HouseCategoryClosingUi(
             return values.filterNotNull().sum()
         }
 
+    val keepInSourceCents: Long?
+        get() {
+            if (!canKeepInSource) return 0
+            val confirmed = confirmedBalanceCents ?: return null
+            val distributed = explicitlyDistributedCents ?: return null
+            return (confirmed - distributed).coerceAtLeast(0)
+        }
+
+    val totalDistributedCents: Long?
+        get() {
+            val explicit = explicitlyDistributedCents ?: return null
+            val kept = keepInSourceCents ?: return null
+            return explicit + kept
+        }
+
     val adjustmentCents: Long?
         get() = confirmedBalanceCents?.minus(calculatedBalanceCents)
 
     val remainingCents: Long?
         get() {
             val confirmed = confirmedBalanceCents ?: return null
-            val distributed = distributedCents ?: return null
-            return confirmed - distributed
+            val explicit = explicitlyDistributedCents ?: return null
+            return if (canKeepInSource) 0 else confirmed - explicit
+        }
+
+    val overDistributedCents: Long?
+        get() {
+            val confirmed = confirmedBalanceCents ?: return null
+            val explicit = explicitlyDistributedCents ?: return null
+            return (explicit - confirmed).coerceAtLeast(0)
         }
 
     val isValid: Boolean
-        get() = confirmedBalanceCents != null && distributedCents == confirmedBalanceCents
+        get() {
+            val confirmed = confirmedBalanceCents ?: return false
+            val explicit = explicitlyDistributedCents ?: return false
+            return if (canKeepInSource) explicit <= confirmed else explicit == confirmed
+        }
 }
 
 data class CloseHouseMonthUiState(
@@ -68,8 +102,10 @@ data class CloseHouseMonthUiState(
     val calculatedAvailableCents: Long = 0,
     val confirmedAvailableText: String = "",
     val availableAdjustmentNote: String = "",
+    val availableDestinations: List<HouseAvailableClosingDestinationUi> = emptyList(),
     val categories: List<HouseCategoryClosingUi> = emptyList(),
     val selectedCategoryId: Long? = null,
+    val showAvailableDistribution: Boolean = false,
     val isLoading: Boolean = true,
     val isClosing: Boolean = false,
     val showConfirmation: Boolean = false,
@@ -82,11 +118,41 @@ data class CloseHouseMonthUiState(
     val availableAdjustmentCents: Long?
         get() = confirmedAvailableCents?.minus(calculatedAvailableCents)
 
+    val availableDistributedToCategoriesCents: Long?
+        get() {
+            val values = availableDestinations.map {
+                parseClosingCentsOrNull(it.amountText, allowBlank = true)
+            }
+            if (values.any { it == null }) return null
+            return values.filterNotNull().sum()
+        }
+
+    val availableKeptCents: Long?
+        get() {
+            val confirmed = confirmedAvailableCents ?: return null
+            val distributed = availableDistributedToCategoriesCents ?: return null
+            return (confirmed - distributed).coerceAtLeast(0)
+        }
+
+    val availableOverDistributedCents: Long?
+        get() {
+            val confirmed = confirmedAvailableCents ?: return null
+            val distributed = availableDistributedToCategoriesCents ?: return null
+            return (distributed - confirmed).coerceAtLeast(0)
+        }
+
+    val availableIsValid: Boolean
+        get() {
+            val confirmed = confirmedAvailableCents ?: return false
+            val distributed = availableDistributedToCategoriesCents ?: return false
+            return distributed <= confirmed
+        }
+
     val canClose: Boolean
         get() = !isLoading &&
             !isClosing &&
             status == HouseMonthStatus.OPEN &&
-            confirmedAvailableCents != null &&
+            availableIsValid &&
             categories.all { it.isValid }
 }
 
@@ -136,6 +202,12 @@ class CloseHouseMonthViewModel @Inject constructor(
                         status = details.status,
                         calculatedAvailableCents = details.availableCents,
                         confirmedAvailableText = formatCentsForInput(details.availableCents),
+                        availableDestinations = activeCategories.map { category ->
+                            HouseAvailableClosingDestinationUi(
+                                categoryId = category.id,
+                                label = category.name
+                            )
+                        },
                         categories = closingCategories,
                         isLoading = false,
                         errorMessage = null
@@ -153,6 +225,24 @@ class CloseHouseMonthViewModel @Inject constructor(
 
     fun updateAvailableAdjustmentNote(value: String) {
         _uiState.value = _uiState.value.copy(availableAdjustmentNote = value)
+    }
+
+    fun openAvailableDistribution() {
+        _uiState.value = _uiState.value.copy(showAvailableDistribution = true, errorMessage = null)
+    }
+
+    fun dismissAvailableDistribution() {
+        _uiState.value = _uiState.value.copy(showAvailableDistribution = false)
+    }
+
+    fun updateAvailableDestinationAmount(categoryId: Long, value: String) {
+        _uiState.value = _uiState.value.copy(
+            availableDestinations = _uiState.value.availableDestinations.map { destination ->
+                if (destination.categoryId == categoryId) destination.copy(amountText = value)
+                else destination
+            },
+            errorMessage = null
+        )
     }
 
     fun openCategory(categoryId: Long) {
@@ -220,22 +310,46 @@ class CloseHouseMonthViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 val confirmedAvailable = requireNotNull(state.confirmedAvailableCents)
+                val availableTransfers = state.availableDestinations.mapNotNull { destination ->
+                    val amount = requireNotNull(
+                        parseClosingCentsOrNull(destination.amountText, allowBlank = true)
+                    )
+                    if (amount == 0L) null
+                    else HouseAvailableClosingTransferDraft(
+                        destinationCategoryId = destination.categoryId,
+                        amountCents = amount
+                    )
+                }
+
                 val categoryDrafts = state.categories.map { row ->
+                    val explicitTransfers = row.destinations.mapNotNull { destination ->
+                        val amount = requireNotNull(
+                            parseClosingCentsOrNull(destination.amountText, allowBlank = true)
+                        )
+                        if (amount == 0L) null
+                        else HouseClosingTransferDraft(
+                            destinationType = destination.type,
+                            destinationCategoryId = destination.categoryId,
+                            amountCents = amount
+                        )
+                    }.toMutableList()
+
+                    if (row.canKeepInSource) {
+                        val keepAmount = requireNotNull(row.keepInSourceCents)
+                        if (keepAmount > 0) {
+                            explicitTransfers += HouseClosingTransferDraft(
+                                destinationType = HouseClosingDestinationType.CATEGORY,
+                                destinationCategoryId = row.categoryId,
+                                amountCents = keepAmount
+                            )
+                        }
+                    }
+
                     HouseCategoryClosingDraft(
                         categoryId = row.categoryId,
                         confirmedBalanceCents = requireNotNull(row.confirmedBalanceCents),
                         adjustmentNote = row.adjustmentNote,
-                        transfers = row.destinations.mapNotNull { destination ->
-                            val amount = requireNotNull(
-                                parseClosingCentsOrNull(destination.amountText, allowBlank = true)
-                            )
-                            if (amount == 0L) null
-                            else HouseClosingTransferDraft(
-                                destinationType = destination.type,
-                                destinationCategoryId = destination.categoryId,
-                                amountCents = amount
-                            )
-                        }
+                        transfers = explicitTransfers
                     )
                 }
 
@@ -250,6 +364,7 @@ class CloseHouseMonthViewModel @Inject constructor(
                         houseMonthId = state.houseMonthId,
                         confirmedAvailableCents = confirmedAvailable,
                         availableAdjustmentNote = state.availableAdjustmentNote,
+                        availableTransfers = availableTransfers,
                         categories = categoryDrafts
                     )
                 )
@@ -277,20 +392,15 @@ class CloseHouseMonthViewModel @Inject constructor(
         activeCategories: List<HouseCategory>,
         sourceIsActive: Boolean
     ): HouseCategoryClosingUi {
-        val categoryDestinations = activeCategories.map { category ->
-            HouseClosingDestinationUi(
-                type = HouseClosingDestinationType.CATEGORY,
-                categoryId = category.id,
-                label = category.name,
-                amountText = if (
-                    sourceIsActive &&
-                    category.id == sourceCategoryId &&
-                    calculatedBalanceCents > 0
-                ) {
-                    formatCentsForInput(calculatedBalanceCents)
-                } else ""
-            )
-        }
+        val categoryDestinations = activeCategories
+            .filterNot { sourceIsActive && it.id == sourceCategoryId }
+            .map { category ->
+                HouseClosingDestinationUi(
+                    type = HouseClosingDestinationType.CATEGORY,
+                    categoryId = category.id,
+                    label = category.name
+                )
+            }
 
         val availableDestination = HouseClosingDestinationUi(
             type = HouseClosingDestinationType.AVAILABLE,
@@ -306,6 +416,7 @@ class CloseHouseMonthViewModel @Inject constructor(
             categoryName = sourceCategoryName,
             calculatedBalanceCents = calculatedBalanceCents,
             confirmedBalanceText = formatCentsForInput(calculatedBalanceCents),
+            canKeepInSource = sourceIsActive,
             destinations = categoryDestinations + availableDestination
         )
     }
