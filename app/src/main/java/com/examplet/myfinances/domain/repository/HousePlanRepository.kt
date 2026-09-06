@@ -1,5 +1,6 @@
 package com.examplet.myfinances.domain.repository
 
+import com.examplet.myfinances.domain.model.FixedExpensePending
 import com.examplet.myfinances.domain.model.HouseMonthCarryover
 import com.examplet.myfinances.domain.model.HouseMonthClosingDraft
 import com.examplet.myfinances.domain.model.HousePlanAccountBalanceDraft
@@ -13,6 +14,8 @@ interface HousePlanRepository {
 
     fun observeDetails(houseMonthId: Long): Flow<HousePlanDetails?>
 
+    fun observePendingFixedExpenses(): Flow<List<FixedExpensePending>>
+
     suspend fun getCarryoverFor(year: Int, month: Int): HouseMonthCarryover
 
     suspend fun createPlan(draft: HousePlanDraft): Long
@@ -23,6 +26,10 @@ interface HousePlanRepository {
         houseMonthId: Long,
         accountBalances: List<HousePlanAccountBalanceDraft>
     )
+
+    suspend fun setFixedExpensePaid(houseMonthId: Long, categoryId: Long, isPaid: Boolean)
+
+    suspend fun markPendingFixedExpensePaid(pendingId: Long)
 
     suspend fun closeMonth(draft: HouseMonthClosingDraft)
 }
