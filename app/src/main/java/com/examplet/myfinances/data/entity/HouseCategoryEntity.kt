@@ -20,6 +20,7 @@ data class HouseCategoryEntity(
     val targetCents: Long? = null,
     @ColumnInfo(defaultValue = "'BUDGET'")
     val behavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
+    val fixedExpenseDefaultCents: Long? = null,
     val sortOrder: Int = 0,
     val isArchived: Boolean = false,
     val createdAt: Long,
