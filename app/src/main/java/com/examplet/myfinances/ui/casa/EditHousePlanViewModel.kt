@@ -46,6 +46,7 @@ data class EditHousePlanUiState(
     val month: Int = 0,
     val status: HouseMonthStatus = HouseMonthStatus.OPEN,
     val totalResourcesText: String = "",
+    val openingAvailableText: String = "",
     val note: String = "",
     val categories: List<EditHousePlanCategoryUi> = emptyList(),
     val positions: List<EditHousePlanPositionUi> = emptyList(),
@@ -60,6 +61,9 @@ data class EditHousePlanUiState(
     val totalResourcesCents: Long
         get() = parseCentsOrZero(totalResourcesText)
 
+    val openingAvailableCents: Long
+        get() = parseCentsOrZero(openingAvailableText)
+
     val allocatedCents: Long
         get() = categories.sumOf { parseCentsOrZero(it.allocatedText) }
 
@@ -69,20 +73,23 @@ data class EditHousePlanUiState(
     val positionedCents: Long
         get() = positions.sumOf { parseCentsOrZero(it.amountText) }
 
-    val unallocatedCents: Long
-        get() = totalResourcesCents - allocatedCents
+    val availableCents: Long
+        get() = openingAvailableCents + totalResourcesCents - allocatedCents
+
+    val totalHouseFundsCents: Long
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
 
     val unpositionedCents: Long
-        get() = totalResourcesCents - positionedCents
+        get() = totalHouseFundsCents - positionedCents
 
     val allocationOverflowCents: Long
         get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
 
     val positionOverflowCents: Long
-        get() = (positionedCents - totalResourcesCents).coerceAtLeast(0)
+        get() = (positionedCents - totalHouseFundsCents).coerceAtLeast(0)
 
     val existingPositionOverflowCents: Long
-        get() = (currentPositionedCents - totalResourcesCents).coerceAtLeast(0)
+        get() = (currentPositionedCents - totalHouseFundsCents).coerceAtLeast(0)
 
     val isClosed: Boolean
         get() = status == HouseMonthStatus.CLOSED
@@ -166,6 +173,9 @@ class EditHousePlanViewModel @Inject constructor(
                         totalResourcesText = if (firstLoad) {
                             formatCentsForInput(details.totalResourcesCents)
                         } else current.totalResourcesText,
+                        openingAvailableText = if (firstLoad) {
+                            formatCentsForInput(details.openingAvailableCents)
+                        } else current.openingAvailableText,
                         note = if (firstLoad) details.note.orEmpty() else current.note,
                         categories = categoryDrafts,
                         positions = positionDrafts,
@@ -178,6 +188,10 @@ class EditHousePlanViewModel @Inject constructor(
 
     fun updateTotalResources(value: String) {
         _uiState.value = _uiState.value.copy(totalResourcesText = value, errorMessage = null)
+    }
+
+    fun updateOpeningAvailable(value: String) {
+        _uiState.value = _uiState.value.copy(openingAvailableText = value, errorMessage = null)
     }
 
     fun updateNote(value: String) {
@@ -243,6 +257,10 @@ class EditHousePlanViewModel @Inject constructor(
                                 year = state.year,
                                 month = state.month,
                                 totalResourcesCents = totalResources,
+                                openingAvailableCents = parseEuroToCents(
+                                    state.openingAvailableText,
+                                    allowBlank = true
+                                ),
                                 note = state.note,
                                 allocations = state.categories.map { row ->
                                     HousePlanAllocationDraft(
