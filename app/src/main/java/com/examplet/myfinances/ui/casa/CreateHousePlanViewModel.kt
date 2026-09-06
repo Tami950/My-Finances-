@@ -109,6 +109,8 @@ class CreateHousePlanViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CreateHousePlanUiState())
     val uiState: StateFlow<CreateHousePlanUiState> = _uiState.asStateFlow()
     private var carryover: HouseMonthCarryover? = null
+    private var categorySheetOriginal: HousePlanCategoryDraftUi? = null
+    private var accountSheetOriginal: HousePlanAccountDraftUi? = null
 
     init {
         viewModelScope.launch {
@@ -180,8 +182,34 @@ class CreateHousePlanViewModel @Inject constructor(
     fun updateTotalResources(value: String) { _uiState.value = _uiState.value.copy(totalResourcesText = value, errorMessage = null) }
     fun updateOpeningAvailable(value: String) { _uiState.value = _uiState.value.copy(openingAvailableText = value, errorMessage = null) }
     fun updateNote(value: String) { _uiState.value = _uiState.value.copy(note = value) }
-    fun openCategory(categoryId: Long) { _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId, errorMessage = null) }
-    fun dismissCategory() { _uiState.value = _uiState.value.copy(selectedCategoryId = null, errorMessage = null) }
+
+    fun openCategory(categoryId: Long) {
+        if (_uiState.value.selectedCategoryId != null) return
+        categorySheetOriginal = _uiState.value.categories.firstOrNull { it.category.id == categoryId }
+        _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId, errorMessage = null)
+    }
+
+    fun dismissCategory() {
+        val original = categorySheetOriginal
+        _uiState.value = _uiState.value.copy(
+            categories = if (original == null) _uiState.value.categories else _uiState.value.categories.map {
+                if (it.category.id == original.category.id) original else it
+            },
+            selectedCategoryId = null,
+            errorMessage = null
+        )
+        categorySheetOriginal = null
+    }
+
+    fun commitCategory() {
+        val id = _uiState.value.selectedCategoryId ?: return
+        val row = _uiState.value.categories.firstOrNull { it.category.id == id } ?: return
+        val locallyValid = row.category.behavior != HouseCategoryBehavior.FIXED_EXPENSE ||
+            (row.fixedExpensePlannedCents > 0 && row.fixedExpensePrefundedCents <= row.fixedExpensePlannedCents)
+        if (!locallyValid) return
+        categorySheetOriginal = null
+        _uiState.value = _uiState.value.copy(selectedCategoryId = null, errorMessage = null)
+    }
 
     fun updateOpeningBalance(categoryId: Long, value: String) {
         _uiState.value = _uiState.value.copy(categories = _uiState.value.categories.map {
@@ -207,8 +235,29 @@ class CreateHousePlanViewModel @Inject constructor(
         })
     }
 
-    fun openAccount(accountId: Long) { _uiState.value = _uiState.value.copy(selectedAccountId = accountId, errorMessage = null) }
-    fun dismissAccount() { _uiState.value = _uiState.value.copy(selectedAccountId = null, errorMessage = null) }
+    fun openAccount(accountId: Long) {
+        if (_uiState.value.selectedAccountId != null) return
+        accountSheetOriginal = _uiState.value.accounts.firstOrNull { it.account.id == accountId }
+        _uiState.value = _uiState.value.copy(selectedAccountId = accountId, errorMessage = null)
+    }
+
+    fun dismissAccount() {
+        val original = accountSheetOriginal
+        _uiState.value = _uiState.value.copy(
+            accounts = if (original == null) _uiState.value.accounts else _uiState.value.accounts.map {
+                if (it.account.id == original.account.id) original else it
+            },
+            selectedAccountId = null,
+            errorMessage = null
+        )
+        accountSheetOriginal = null
+    }
+
+    fun commitAccount() {
+        accountSheetOriginal = null
+        _uiState.value = _uiState.value.copy(selectedAccountId = null, errorMessage = null)
+    }
+
     fun updateAccountAmount(accountId: Long, value: String) {
         _uiState.value = _uiState.value.copy(accounts = _uiState.value.accounts.map {
             if (it.account.id == accountId) it.copy(amountText = value) else it
