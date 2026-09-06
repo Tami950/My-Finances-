@@ -3,12 +3,14 @@ package com.examplet.myfinances.data.db
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.examplet.myfinances.data.dao.FixedExpensePendingDao
 import com.examplet.myfinances.data.dao.HouseCategoryDao
 import com.examplet.myfinances.data.dao.HouseMonthAccountBalanceDao
 import com.examplet.myfinances.data.dao.HouseMonthClosingDao
 import com.examplet.myfinances.data.dao.HouseMonthDao
 import com.examplet.myfinances.data.dao.HouseMonthlyAllocationDao
 import com.examplet.myfinances.data.dao.MoneyAccountDao
+import com.examplet.myfinances.data.entity.FixedExpensePendingEntity
 import com.examplet.myfinances.data.entity.HouseCategoryEntity
 import com.examplet.myfinances.data.entity.HouseMonthAccountBalanceEntity
 import com.examplet.myfinances.data.entity.HouseMonthAvailableClosingTransferEntity
@@ -29,9 +31,10 @@ import com.examplet.myfinances.data.entity.MoneyAccountEntity
         HouseMonthClosingEntity::class,
         HouseMonthCategoryClosingEntity::class,
         HouseMonthClosingTransferEntity::class,
-        HouseMonthAvailableClosingTransferEntity::class
+        HouseMonthAvailableClosingTransferEntity::class,
+        FixedExpensePendingEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -42,4 +45,5 @@ abstract class MyFinancesDatabase : RoomDatabase() {
     abstract fun houseMonthlyAllocationDao(): HouseMonthlyAllocationDao
     abstract fun houseMonthAccountBalanceDao(): HouseMonthAccountBalanceDao
     abstract fun houseMonthClosingDao(): HouseMonthClosingDao
+    abstract fun fixedExpensePendingDao(): FixedExpensePendingDao
 }
