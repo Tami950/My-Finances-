@@ -27,6 +27,7 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         type: HouseCategoryType,
         targetCents: Long?,
         behavior: HouseCategoryBehavior,
+        fixedExpenseDefaultCents: Long?,
         sortOrder: Int
     ): Long {
         val normalizedName = name.trim()
@@ -34,15 +35,16 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         require(houseCategoryDao.countByName(normalizedName) == 0) {
             "Esiste già una categoria con questo nome"
         }
-        validateTarget(type, targetCents)
+        validateCategory(behavior, type, targetCents, fixedExpenseDefaultCents)
 
         val now = System.currentTimeMillis()
         return houseCategoryDao.insert(
             HouseCategoryEntity(
                 name = normalizedName,
-                type = type,
-                targetCents = normalizedTarget(type, targetCents),
+                type = normalizedType(behavior, type),
+                targetCents = normalizedTarget(behavior, type, targetCents),
                 behavior = behavior,
+                fixedExpenseDefaultCents = normalizedFixedDefault(behavior, fixedExpenseDefaultCents),
                 sortOrder = sortOrder,
                 createdAt = now,
                 updatedAt = now
@@ -55,53 +57,83 @@ class HouseCategoryRepositoryImpl @Inject constructor(
         name: String,
         type: HouseCategoryType,
         targetCents: Long?,
-        behavior: HouseCategoryBehavior
+        behavior: HouseCategoryBehavior,
+        fixedExpenseDefaultCents: Long?,
+        applyFixedExpenseDefaultToOpenMonth: Boolean
     ) {
         val normalizedName = name.trim()
         require(normalizedName.isNotEmpty()) { "Il nome della categoria non può essere vuoto" }
         require(houseCategoryDao.countByName(normalizedName, excludeId = id) == 0) {
             "Esiste già una categoria con questo nome"
         }
-        validateTarget(type, targetCents)
+        validateCategory(behavior, type, targetCents, fixedExpenseDefaultCents)
 
         val current = requireNotNull(houseCategoryDao.getById(id)) { "Categoria non trovata" }
         val now = System.currentTimeMillis()
+        val fixedDefault = normalizedFixedDefault(behavior, fixedExpenseDefaultCents)
         houseCategoryDao.update(
             current.copy(
                 name = normalizedName,
-                type = type,
-                targetCents = normalizedTarget(type, targetCents),
+                type = normalizedType(behavior, type),
+                targetCents = normalizedTarget(behavior, type, targetCents),
                 behavior = behavior,
+                fixedExpenseDefaultCents = fixedDefault,
                 updatedAt = now
             )
         )
 
-        // An OPEN month is still editable. Keep its behavior snapshot aligned so a category
-        // converted to fixed expense can be tested/used immediately in the current month.
         allocationDao.updateBehaviorForOpenMonths(
             categoryId = id,
             behavior = behavior,
             paymentStatus = if (behavior == HouseCategoryBehavior.FIXED_EXPENSE) {
                 FixedExpensePaymentStatus.PLANNED
             } else null,
+            fixedExpensePlannedCents = fixedDefault,
             updatedAt = now
         )
+
+        if (
+            behavior == HouseCategoryBehavior.FIXED_EXPENSE &&
+            applyFixedExpenseDefaultToOpenMonth &&
+            fixedDefault != null
+        ) {
+            allocationDao.updateFixedExpensePlanForOpenMonths(id, fixedDefault, now)
+        }
     }
 
     override suspend fun setCategoryArchived(id: Long, isArchived: Boolean) {
         houseCategoryDao.setArchived(id, isArchived, System.currentTimeMillis())
     }
 
-    private fun validateTarget(type: HouseCategoryType, targetCents: Long?) {
-        if (type == HouseCategoryType.TARGET) {
-            require(targetCents != null && targetCents > 0) {
-                "Una categoria con obiettivo richiede un importo maggiore di zero"
+    private fun validateCategory(
+        behavior: HouseCategoryBehavior,
+        type: HouseCategoryType,
+        targetCents: Long?,
+        fixedExpenseDefaultCents: Long?
+    ) {
+        when (behavior) {
+            HouseCategoryBehavior.BUDGET -> if (type == HouseCategoryType.TARGET) {
+                require(targetCents != null && targetCents > 0) {
+                    "Una categoria con obiettivo richiede un importo maggiore di zero"
+                }
             }
+            HouseCategoryBehavior.FIXED_EXPENSE -> require(
+                fixedExpenseDefaultCents != null && fixedExpenseDefaultCents > 0
+            ) { "Una spesa fissa richiede un importo abituale maggiore di zero" }
         }
     }
 
-    private fun normalizedTarget(type: HouseCategoryType, targetCents: Long?): Long? =
-        if (type == HouseCategoryType.TARGET) targetCents else null
+    private fun normalizedType(behavior: HouseCategoryBehavior, type: HouseCategoryType): HouseCategoryType =
+        if (behavior == HouseCategoryBehavior.FIXED_EXPENSE) HouseCategoryType.FLEXIBLE else type
+
+    private fun normalizedTarget(
+        behavior: HouseCategoryBehavior,
+        type: HouseCategoryType,
+        targetCents: Long?
+    ): Long? = if (behavior == HouseCategoryBehavior.BUDGET && type == HouseCategoryType.TARGET) targetCents else null
+
+    private fun normalizedFixedDefault(behavior: HouseCategoryBehavior, cents: Long?): Long? =
+        if (behavior == HouseCategoryBehavior.FIXED_EXPENSE) cents else null
 }
 
 private fun HouseCategoryEntity.toDomain() = HouseCategory(
@@ -110,6 +142,7 @@ private fun HouseCategoryEntity.toDomain() = HouseCategory(
     type = type,
     targetCents = targetCents,
     behavior = behavior,
+    fixedExpenseDefaultCents = fixedExpenseDefaultCents,
     sortOrder = sortOrder,
     isArchived = isArchived
 )
