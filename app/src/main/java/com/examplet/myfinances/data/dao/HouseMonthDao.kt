@@ -14,6 +14,8 @@ data class HousePlanSummaryRow(
     val year: Int,
     val month: Int,
     val totalResourcesCents: Long,
+    val openingAvailableCents: Long,
+    val openingBalanceCents: Long,
     val allocatedCents: Long,
     val positionedCents: Long,
     val status: HouseMonthStatus
@@ -40,6 +42,12 @@ interface HouseMonthDao {
             hm.year AS year,
             hm.month AS month,
             hm.totalResourcesCents AS totalResourcesCents,
+            hm.openingAvailableCents AS openingAvailableCents,
+            COALESCE((
+                SELECT SUM(a.openingBalanceCents)
+                FROM house_monthly_allocations a
+                WHERE a.houseMonthId = hm.id
+            ), 0) AS openingBalanceCents,
             COALESCE((
                 SELECT SUM(a.allocatedCents)
                 FROM house_monthly_allocations a
