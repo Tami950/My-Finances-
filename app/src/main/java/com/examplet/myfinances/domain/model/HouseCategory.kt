@@ -5,6 +5,7 @@ data class HouseCategory(
     val name: String,
     val type: HouseCategoryType,
     val targetCents: Long?,
+    val behavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
     val sortOrder: Int,
     val isArchived: Boolean
 )
