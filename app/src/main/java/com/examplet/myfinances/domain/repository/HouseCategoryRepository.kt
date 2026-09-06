@@ -13,6 +13,7 @@ interface HouseCategoryRepository {
         type: HouseCategoryType,
         targetCents: Long? = null,
         behavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
+        fixedExpenseDefaultCents: Long? = null,
         sortOrder: Int = 0
     ): Long
 
@@ -21,7 +22,9 @@ interface HouseCategoryRepository {
         name: String,
         type: HouseCategoryType,
         targetCents: Long?,
-        behavior: HouseCategoryBehavior
+        behavior: HouseCategoryBehavior,
+        fixedExpenseDefaultCents: Long?,
+        applyFixedExpenseDefaultToOpenMonth: Boolean = false
     )
 
     suspend fun setCategoryArchived(id: Long, isArchived: Boolean)
