@@ -5,10 +5,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            "ALTER TABLE house_months ADD COLUMN openingAvailableCents INTEGER NOT NULL DEFAULT 0"
-        )
-
+        db.execSQL("ALTER TABLE house_months ADD COLUMN openingAvailableCents INTEGER NOT NULL DEFAULT 0")
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS `house_month_closings` (
@@ -24,10 +21,7 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
             )
             """.trimIndent()
         )
-        db.execSQL(
-            "CREATE UNIQUE INDEX IF NOT EXISTS `index_house_month_closings_houseMonthId` ON `house_month_closings` (`houseMonthId`)"
-        )
-
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_house_month_closings_houseMonthId` ON `house_month_closings` (`houseMonthId`)")
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS `house_month_category_closings` (
@@ -45,13 +39,8 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
             )
             """.trimIndent()
         )
-        db.execSQL(
-            "CREATE UNIQUE INDEX IF NOT EXISTS `index_house_month_category_closings_houseMonthId_categoryId` ON `house_month_category_closings` (`houseMonthId`, `categoryId`)"
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_month_category_closings_categoryId` ON `house_month_category_closings` (`categoryId`)"
-        )
-
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_house_month_category_closings_houseMonthId_categoryId` ON `house_month_category_closings` (`houseMonthId`, `categoryId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_month_category_closings_categoryId` ON `house_month_category_closings` (`categoryId`)")
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS `house_month_closing_transfers` (
@@ -68,15 +57,9 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
             )
             """.trimIndent()
         )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_month_closing_transfers_houseMonthId` ON `house_month_closing_transfers` (`houseMonthId`)"
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_month_closing_transfers_sourceCategoryId` ON `house_month_closing_transfers` (`sourceCategoryId`)"
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_month_closing_transfers_destinationCategoryId` ON `house_month_closing_transfers` (`destinationCategoryId`)"
-        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_month_closing_transfers_houseMonthId` ON `house_month_closing_transfers` (`houseMonthId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_month_closing_transfers_sourceCategoryId` ON `house_month_closing_transfers` (`sourceCategoryId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_month_closing_transfers_destinationCategoryId` ON `house_month_closing_transfers` (`destinationCategoryId`)")
     }
 }
 
@@ -95,39 +78,20 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
             )
             """.trimIndent()
         )
-        db.execSQL(
-            "CREATE UNIQUE INDEX IF NOT EXISTS `index_house_month_available_closing_transfers_houseMonthId_destinationCategoryId` ON `house_month_available_closing_transfers` (`houseMonthId`, `destinationCategoryId`)"
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_month_available_closing_transfers_destinationCategoryId` ON `house_month_available_closing_transfers` (`destinationCategoryId`)"
-        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_house_month_available_closing_transfers_houseMonthId_destinationCategoryId` ON `house_month_available_closing_transfers` (`houseMonthId`, `destinationCategoryId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_month_available_closing_transfers_destinationCategoryId` ON `house_month_available_closing_transfers` (`destinationCategoryId`)")
     }
 }
 
 val MIGRATION_7_8 = object : Migration(7, 8) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            "ALTER TABLE house_categories ADD COLUMN behavior TEXT NOT NULL DEFAULT 'BUDGET'"
-        )
-        db.execSQL(
-            "ALTER TABLE house_monthly_allocations ADD COLUMN categoryBehavior TEXT NOT NULL DEFAULT 'BUDGET'"
-        )
-        db.execSQL(
-            "ALTER TABLE house_monthly_allocations ADD COLUMN fixedExpensePaymentStatus TEXT"
-        )
-        db.execSQL(
-            "ALTER TABLE house_month_category_closings ADD COLUMN categoryBehavior TEXT NOT NULL DEFAULT 'BUDGET'"
-        )
-        db.execSQL(
-            "ALTER TABLE house_month_category_closings ADD COLUMN fixedExpenseClosingAction TEXT"
-        )
-        db.execSQL(
-            "ALTER TABLE house_month_category_closings ADD COLUMN fixedExpensePendingNote TEXT"
-        )
-        db.execSQL(
-            "ALTER TABLE house_month_closings ADD COLUMN unreconciledFixedExpenseDeficitCents INTEGER NOT NULL DEFAULT 0"
-        )
-
+        db.execSQL("ALTER TABLE house_categories ADD COLUMN behavior TEXT NOT NULL DEFAULT 'BUDGET'")
+        db.execSQL("ALTER TABLE house_monthly_allocations ADD COLUMN categoryBehavior TEXT NOT NULL DEFAULT 'BUDGET'")
+        db.execSQL("ALTER TABLE house_monthly_allocations ADD COLUMN fixedExpensePaymentStatus TEXT")
+        db.execSQL("ALTER TABLE house_month_category_closings ADD COLUMN categoryBehavior TEXT NOT NULL DEFAULT 'BUDGET'")
+        db.execSQL("ALTER TABLE house_month_category_closings ADD COLUMN fixedExpenseClosingAction TEXT")
+        db.execSQL("ALTER TABLE house_month_category_closings ADD COLUMN fixedExpensePendingNote TEXT")
+        db.execSQL("ALTER TABLE house_month_closings ADD COLUMN unreconciledFixedExpenseDeficitCents INTEGER NOT NULL DEFAULT 0")
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS `house_fixed_expense_pendings` (
@@ -145,14 +109,25 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
             )
             """.trimIndent()
         )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_sourceHouseMonthId` ON `house_fixed_expense_pendings` (`sourceHouseMonthId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_categoryId` ON `house_fixed_expense_pendings` (`categoryId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_status` ON `house_fixed_expense_pendings` (`status`)")
+    }
+}
+
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE house_categories ADD COLUMN fixedExpenseDefaultCents INTEGER")
+        db.execSQL("ALTER TABLE house_monthly_allocations ADD COLUMN fixedExpensePlannedCents INTEGER")
+        db.execSQL("ALTER TABLE house_monthly_allocations ADD COLUMN fixedExpensePrefundedCents INTEGER NOT NULL DEFAULT 0")
         db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_sourceHouseMonthId` ON `house_fixed_expense_pendings` (`sourceHouseMonthId`)"
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_categoryId` ON `house_fixed_expense_pendings` (`categoryId`)"
-        )
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_house_fixed_expense_pendings_status` ON `house_fixed_expense_pendings` (`status`)"
+            """
+            UPDATE house_monthly_allocations
+            SET fixedExpensePlannedCents = openingBalanceCents + allocatedCents,
+                openingBalanceCents = 0,
+                fixedExpensePrefundedCents = 0
+            WHERE categoryBehavior = 'FIXED_EXPENSE'
+            """.trimIndent()
         )
     }
 }
