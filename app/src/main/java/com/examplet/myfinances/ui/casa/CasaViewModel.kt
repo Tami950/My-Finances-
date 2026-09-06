@@ -66,6 +66,12 @@ private data class CoreCasaState(
     val categoryDraft: CategoryDraft?
 )
 
+private data class TemporalCasaState(
+    val currentPlan: HousePlanSummary?,
+    val previousPlan: HousePlanSummary?,
+    val currentPlanDetails: HousePlanDetails?
+)
+
 @HiltViewModel
 class CasaViewModel @Inject constructor(
     private val categoryRepository: HouseCategoryRepository,
@@ -107,14 +113,24 @@ class CasaViewModel @Inject constructor(
         else housePlanRepository.observeDetails(summary.id)
     }
 
+    private val temporalState = combine(
+        currentPlan,
+        previousPlan,
+        currentPlanDetails
+    ) { current, previous, details ->
+        TemporalCasaState(
+            currentPlan = current,
+            previousPlan = previous,
+            currentPlanDetails = details
+        )
+    }
+
     val uiState: StateFlow<CasaUiState> = combine(
         coreState,
         moneyAccountDraft,
         errorMessage,
-        currentPlan,
-        previousPlan,
-        currentPlanDetails
-    ) { core, accountDraft, error, plan, previous, details ->
+        temporalState
+    ) { core, accountDraft, error, temporal ->
         val planningReady =
             core.categories.any { !it.isArchived } && core.moneyAccounts.any { !it.isArchived }
 
@@ -123,9 +139,9 @@ class CasaViewModel @Inject constructor(
             isPlanningReady = planningReady,
             categories = core.categories,
             moneyAccounts = core.moneyAccounts,
-            currentPlan = plan,
-            previousPlan = previous,
-            currentPlanDetails = details,
+            currentPlan = temporal.currentPlan,
+            previousPlan = temporal.previousPlan,
+            currentPlanDetails = temporal.currentPlanDetails,
             selectedTab = core.selectedTab,
             categoryDraft = core.categoryDraft,
             moneyAccountDraft = accountDraft,
