@@ -1,6 +1,7 @@
 package com.examplet.myfinances.domain.repository
 
 import com.examplet.myfinances.domain.model.HouseCategory
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 import kotlinx.coroutines.flow.Flow
 
@@ -11,6 +12,7 @@ interface HouseCategoryRepository {
         name: String,
         type: HouseCategoryType,
         targetCents: Long? = null,
+        behavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
         sortOrder: Int = 0
     ): Long
 
@@ -18,7 +20,8 @@ interface HouseCategoryRepository {
         id: Long,
         name: String,
         type: HouseCategoryType,
-        targetCents: Long?
+        targetCents: Long?,
+        behavior: HouseCategoryBehavior
     )
 
     suspend fun setCategoryArchived(id: Long, isArchived: Boolean)
