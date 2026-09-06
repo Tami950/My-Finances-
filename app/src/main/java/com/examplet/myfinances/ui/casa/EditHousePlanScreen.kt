@@ -103,6 +103,19 @@ fun EditHousePlanScreen(
                             )
                         }
 
+                        item(key = "opening-available") {
+                            OutlinedTextField(
+                                value = state.openingAvailableText,
+                                onValueChange = viewModel::updateOpeningAvailable,
+                                label = { Text(stringResource(R.string.house_opening_available)) },
+                                supportingText = { Text(stringResource(R.string.house_opening_available_help)) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                enabled = !state.isClosed,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
                         item(key = "note") {
                             OutlinedTextField(
                                 value = state.note,
@@ -159,13 +172,23 @@ fun EditHousePlanScreen(
                                     stringResource(R.string.house_summary_resources),
                                     state.totalResourcesCents
                                 )
+                                if (state.openingAvailableCents > 0) {
+                                    SummaryRow(
+                                        stringResource(R.string.house_summary_opening_available),
+                                        state.openingAvailableCents
+                                    )
+                                }
                                 SummaryRow(
                                     stringResource(R.string.house_summary_allocated),
                                     state.allocatedCents
                                 )
                                 SummaryRow(
                                     stringResource(R.string.house_summary_unallocated),
-                                    state.unallocatedCents
+                                    state.availableCents
+                                )
+                                SummaryRow(
+                                    stringResource(R.string.house_summary_total_funds),
+                                    state.totalHouseFundsCents
                                 )
                                 if (state.allocationOverflowCents > 0) {
                                     Text(
@@ -196,8 +219,8 @@ fun EditHousePlanScreen(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 SummaryRow(
-                                    stringResource(R.string.house_summary_resources),
-                                    state.totalResourcesCents
+                                    stringResource(R.string.house_summary_total_funds),
+                                    state.totalHouseFundsCents
                                 )
                             }
                         }
