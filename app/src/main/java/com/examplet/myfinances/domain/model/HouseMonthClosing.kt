@@ -9,7 +9,13 @@ data class HouseMonthClosingDraft(
     val houseMonthId: Long,
     val confirmedAvailableCents: Long,
     val availableAdjustmentNote: String? = null,
+    val availableTransfers: List<HouseAvailableClosingTransferDraft> = emptyList(),
     val categories: List<HouseCategoryClosingDraft>
+)
+
+data class HouseAvailableClosingTransferDraft(
+    val destinationCategoryId: Long,
+    val amountCents: Long
 )
 
 data class HouseCategoryClosingDraft(
