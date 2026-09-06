@@ -153,6 +153,18 @@ internal fun HousePlanningContent(
                 if (details.openingBalanceCents > 0) {
                     HousePlanningSummaryRow(stringResource(R.string.house_summary_opening), details.openingBalanceCents)
                 }
+                if (details.prefundedFixedExpensesCents > 0) {
+                    HousePlanningSummaryRow(
+                        stringResource(R.string.house_summary_prefunded_fixed),
+                        details.prefundedFixedExpensesCents
+                    )
+                }
+                if (details.pendingFixedExpensesCents > 0) {
+                    HousePlanningSummaryRow(
+                        stringResource(R.string.house_summary_pending_fixed),
+                        details.pendingFixedExpensesCents
+                    )
+                }
                 HousePlanningSummaryRow(stringResource(R.string.house_summary_total_funds), details.totalHouseFundsCents)
                 details.note?.takeIf { it.isNotBlank() }?.let { note ->
                     Spacer(Modifier.height(8.dp))
@@ -210,20 +222,23 @@ internal fun HousePlanningContent(
                     Text(formatHouseCents(allocation.totalAvailableCents), fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(4.dp))
-                HousePlanningSummaryRow(stringResource(R.string.house_opening_balance), allocation.openingBalanceCents)
-                HousePlanningSummaryRow(stringResource(R.string.house_new_allocation), allocation.allocatedCents)
-                if (allocation.categoryType == HouseCategoryType.TARGET) {
-                    allocation.targetCents?.let { target ->
-                        HousePlanningSummaryRow(stringResource(R.string.house_category_target_amount), target)
-                    }
-                }
+
                 if (allocation.categoryBehavior == HouseCategoryBehavior.FIXED_EXPENSE) {
+                    HousePlanningSummaryRow(
+                        stringResource(R.string.house_fixed_expense_planned),
+                        allocation.fixedExpensePlannedCents ?: allocation.allocatedCents
+                    )
+                    HousePlanningSummaryRow(
+                        stringResource(R.string.house_fixed_expense_prefunded),
+                        allocation.fixedExpensePrefundedCents
+                    )
+                    HousePlanningSummaryRow(
+                        stringResource(R.string.house_fixed_expense_from_new_resources),
+                        allocation.allocatedCents
+                    )
                     val paid = allocation.fixedExpensePaymentStatus == FixedExpensePaymentStatus.PAID
                     Text(
-                        stringResource(
-                            if (paid) R.string.house_fixed_expense_paid
-                            else R.string.house_fixed_expense_unpaid
-                        ),
+                        stringResource(if (paid) R.string.house_fixed_expense_paid else R.string.house_fixed_expense_unpaid),
                         style = MaterialTheme.typography.bodySmall
                     )
                     if (isOpen) {
@@ -237,6 +252,14 @@ internal fun HousePlanningContent(
                                     else R.string.house_fixed_expense_mark_paid
                                 )
                             )
+                        }
+                    }
+                } else {
+                    HousePlanningSummaryRow(stringResource(R.string.house_opening_balance), allocation.openingBalanceCents)
+                    HousePlanningSummaryRow(stringResource(R.string.house_new_allocation), allocation.allocatedCents)
+                    if (allocation.categoryType == HouseCategoryType.TARGET) {
+                        allocation.targetCents?.let { target ->
+                            HousePlanningSummaryRow(stringResource(R.string.house_category_target_amount), target)
                         }
                     }
                 }
