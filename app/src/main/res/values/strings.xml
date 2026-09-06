@@ -25,13 +25,14 @@
     <string name="house_plan_month">Pianifica mese</string>
     <string name="house_create_plan_title">Pianifica %1$s</string>
     <string name="house_month_resources">Nuove risorse Casa del mese</string>
+    <string name="house_month_resources_prefill_help">Precompilato dalle risorse abituali di Casa. Puoi modificarlo per questo mese.</string>
     <string name="house_opening_available">Disponibile ereditato</string>
-    <string name="house_opening_available_help">Importo libero riportato dal mese precedente. È modificabile per correggere eventuali discrepanze.</string>
+    <string name="house_opening_available_help">Importo libero riportato dal mese precedente. Nel primo mese è automaticamente 0. È modificabile per correggere eventuali discrepanze.</string>
     <string name="house_month_note">Nota (opzionale)</string>
     <string name="house_plan_categories_title">Categorie</string>
     <string name="house_plan_accounts_title">Posizione attuale dei soldi</string>
     <string name="house_current_positions_title">Posizione attuale dei soldi</string>
-    <string name="house_positions_current_help">Indica dove si trovano adesso tutti i fondi Casa, compresi i residui ereditati. Lo stesso denaro non può essere conteggiato in più posizioni.</string>
+    <string name="house_positions_current_help">Indica dove si trovano adesso tutti i fondi Casa, compresi residui, prefinanziamenti e spese pendenti. Lo stesso denaro non può essere conteggiato in più posizioni.</string>
     <string name="house_positions_empty_current">Nessuna risorsa è ancora stata assegnata a una posizione.</string>
     <string name="house_plan_summary">Riepilogo</string>
     <string name="house_plan_category_breakdown">Già presente: %1$s · Nuova allocazione: %2$s</string>
@@ -45,6 +46,7 @@
     <string name="house_summary_allocated">Allocato</string>
     <string name="house_summary_unallocated">Disponibile</string>
     <string name="house_summary_opening">Residui iniziali categorie</string>
+    <string name="house_summary_prefunded_fixed">Spese fisse già prefinanziate</string>
     <string name="house_summary_pending_fixed">Spese fisse pendenti già finanziate</string>
     <string name="house_summary_total_funds">Fondi Casa complessivi</string>
     <string name="house_summary_positioned">Posizionato</string>
@@ -88,16 +90,26 @@
     <string name="house_closing_confirm_description">Dopo la conferma il mese diventa storico e non sarà più modificabile dai normali flussi. Le distribuzioni verranno usate per preparare il mese successivo.</string>
     <string name="house_closing_adjusted_categories_count">Categorie con rettifica manuale: %1$d</string>
     <string name="house_closing_in_progress">Chiusura…</string>
+    <string name="house_closing_fixed_destination_limit">Puoi prefinanziare al massimo %1$s per questa spesa fissa.</string>
 
     <string name="house_category_fixed_expense">Spesa fissa</string>
     <string name="house_category_fixed_expense_badge">Spesa fissa</string>
-    <string name="house_category_fixed_expense_help">L’importo pianificato viene considerato impegnato nel mese. Non richiede movimenti ordinari e in chiusura si riconcilia come spesa pagata, pendente o non più dovuta.</string>
+    <string name="house_category_fixed_expense_help">L’importo previsto viene considerato impegnato nel mese. Non usa Libera/Obiettivo e non richiede movimenti ordinari.</string>
+    <string name="house_fixed_expense_default_amount">Importo abituale mensile</string>
+    <string name="house_fixed_expense_default_amount_help">Viene proposto automaticamente nei nuovi mesi e resta sempre modificabile nel singolo mese.</string>
     <string name="house_fixed_expense_paid">Pagata</string>
     <string name="house_fixed_expense_unpaid">Da pagare</string>
     <string name="house_fixed_expense_mark_paid">Segna come pagata</string>
     <string name="house_fixed_expense_mark_unpaid">Segna come da pagare</string>
-    <string name="house_fixed_expense_planned">Importo pianificato</string>
+    <string name="house_fixed_expense_planned">Importo previsto del mese</string>
     <string name="house_fixed_expense_actual">Importo reale</string>
+    <string name="house_fixed_expense_prefunded">Già prefinanziato</string>
+    <string name="house_fixed_expense_from_new_resources">Da nuove risorse</string>
+    <string name="house_fixed_expense_plan_breakdown">Già coperto: %1$s · Da nuove risorse: %2$s</string>
+    <string name="house_fixed_expense_prefunded_overflow">L’importo già prefinanziato supera il nuovo importo previsto. Ridistribuisci prima l’eccedenza.</string>
+    <string name="house_fixed_expense_use_as_default">Usa questo importo come nuovo valore abituale</string>
+    <string name="house_fixed_expense_default_confirm_title">Aggiornare i valori abituali?</string>
+    <string name="house_fixed_expense_default_confirm_description">Hai scelto di usare uno o più importi di questo mese come nuovi valori abituali. Verranno proposti automaticamente nei mesi successivi.</string>
     <string name="house_fixed_expense_close_question">Questa spesa risulta ancora da pagare. Cosa è successo?</string>
     <string name="house_fixed_expense_action_paid">L’ho pagata, non avevo aggiornato lo stato</string>
     <string name="house_fixed_expense_action_pending">Resta da pagare</string>
@@ -105,13 +117,24 @@
     <string name="house_fixed_expense_pending_note">Nota per il mese successivo (opzionale)</string>
     <string name="house_fixed_expense_surplus">Importo liberato</string>
     <string name="house_fixed_expense_deficit">Extra rispetto al pianificato</string>
-    <string name="house_fixed_expense_surplus_help">L’importo liberato va al Disponibile per default. Puoi spostarne una parte o tutto in altre categorie.</string>
+    <string name="house_fixed_expense_surplus_help">L’importo liberato va al Disponibile per default. Puoi spostarne una parte o tutto in categorie budget.</string>
     <string name="house_fixed_expense_keep_available">Al Disponibile</string>
     <string name="house_fixed_expense_deficit_help">L’extra viene tolto automaticamente dal Disponibile.</string>
     <string name="house_fixed_expense_uncovered_warning">Le spese fisse superano il Disponibile di %1$s. La chiusura è comunque possibile, ma resta una discrepanza da controllare.</string>
     <string name="house_fixed_expense_uncovered_confirm">Confermando, la discrepanza verrà conservata nello storico invece di inventare una provenienza del denaro.</string>
     <string name="house_pending_fixed_expenses_title">Spese fisse pendenti</string>
     <string name="house_pending_fixed_expense_inherited">Ereditato da %1$s</string>
+
+    <string name="house_customization_planning_defaults">Impostazioni pianificazione</string>
+    <string name="house_usual_monthly_resources">Nuove risorse Casa abituali</string>
+    <string name="house_usual_monthly_resources_help">Se impostate, vengono precompilate automaticamente quando crei un nuovo mese.</string>
+    <string name="house_apply_fixed_default_scope">Quando deve valere il nuovo importo?</string>
+    <string name="house_apply_from_next_month">Dal prossimo mese</string>
+    <string name="house_apply_to_current_month">Anche al mese corrente</string>
+    <string name="house_fixed_increase_source">Servono altri %1$s. Da dove vuoi prenderli?</string>
+    <string name="house_fixed_decrease_destination">Si liberano %1$s. Dove vuoi metterli?</string>
+    <string name="house_use_available">Disponibile (%1$s)</string>
+    <string name="house_choose_budget_category">Categoria budget</string>
 
     <string name="house_categories_title">Categorie Casa</string>
     <string name="house_categories_empty">Non hai ancora creato categorie.</string>
@@ -139,6 +162,7 @@
 
     <string name="action_save">Salva</string>
     <string name="action_cancel">Annulla</string>
+    <string name="action_confirm">Conferma</string>
     <string name="action_back">Indietro</string>
     <string name="action_done">Fatto</string>
     <string name="action_saving">Salvataggio…</string>
