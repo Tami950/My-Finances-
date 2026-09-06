@@ -1,9 +1,12 @@
 package com.examplet.myfinances.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.examplet.myfinances.domain.model.FixedExpensePaymentStatus
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 
 @Entity(
     tableName = "house_monthly_allocations",
@@ -32,6 +35,9 @@ data class HouseMonthlyAllocationEntity(
     val id: Long = 0,
     val houseMonthId: Long,
     val categoryId: Long,
+    @ColumnInfo(defaultValue = "'BUDGET'")
+    val categoryBehavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
+    val fixedExpensePaymentStatus: FixedExpensePaymentStatus? = null,
     val openingBalanceCents: Long = 0,
     val allocatedCents: Long = 0,
     val createdAt: Long,
