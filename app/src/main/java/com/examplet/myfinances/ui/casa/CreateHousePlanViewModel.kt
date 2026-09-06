@@ -39,6 +39,7 @@ data class CreateHousePlanUiState(
     val month: Int = LocalDate.now().monthValue,
     val totalResourcesText: String = "",
     val openingAvailableText: String = "",
+    val pendingFixedExpensesCents: Long = 0,
     val note: String = "",
     val categories: List<HousePlanCategoryDraftUi> = emptyList(),
     val accounts: List<HousePlanAccountDraftUi> = emptyList(),
@@ -54,7 +55,8 @@ data class CreateHousePlanUiState(
     val positionedCents: Long get() = accounts.sumOf { parseCentsOrZero(it.amountText) }
     val totalResourcesCents: Long get() = parseCentsOrZero(totalResourcesText)
     val availableCents: Long get() = openingAvailableCents + totalResourcesCents - allocatedCents
-    val totalHouseFundsCents: Long get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
+    val totalHouseFundsCents: Long
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents + pendingFixedExpensesCents
     val unpositionedCents: Long get() = totalHouseFundsCents - positionedCents
     val allocationOverflowCents: Long get() = (allocatedCents - totalResourcesCents).coerceAtLeast(0)
     val positionOverflowCents: Long get() = (positionedCents - totalHouseFundsCents).coerceAtLeast(0)
@@ -115,6 +117,13 @@ class CreateHousePlanViewModel @Inject constructor(
                     accounts = accounts.map { account ->
                         previous[account.id]?.copy(account = account) ?: HousePlanAccountDraftUi(account)
                     }
+                )
+            }
+        }
+        viewModelScope.launch {
+            housePlanRepository.observePendingFixedExpenses().collect { pendings ->
+                _uiState.value = _uiState.value.copy(
+                    pendingFixedExpensesCents = pendings.sumOf { it.amountCents }
                 )
             }
         }
