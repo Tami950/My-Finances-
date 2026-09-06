@@ -120,13 +120,36 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         db.execSQL("ALTER TABLE house_categories ADD COLUMN fixedExpenseDefaultCents INTEGER")
         db.execSQL("ALTER TABLE house_monthly_allocations ADD COLUMN fixedExpensePlannedCents INTEGER")
         db.execSQL("ALTER TABLE house_monthly_allocations ADD COLUMN fixedExpensePrefundedCents INTEGER NOT NULL DEFAULT 0")
+
+        // In v8 a FIXED_EXPENSE could still carry openingBalanceCents. In v9 that amount is
+        // explicitly represented as prefunding so its provenance is not lost.
         db.execSQL(
             """
             UPDATE house_monthly_allocations
             SET fixedExpensePlannedCents = openingBalanceCents + allocatedCents,
-                openingBalanceCents = 0,
-                fixedExpensePrefundedCents = 0
+                fixedExpensePrefundedCents = openingBalanceCents,
+                openingBalanceCents = 0
             WHERE categoryBehavior = 'FIXED_EXPENSE'
+            """.trimIndent()
+        )
+
+        // Existing fixed categories need a usable habitual amount after migration. Use the
+        // latest monthly fixed plan when one exists; categories without history remain NULL
+        // and must be completed explicitly in Personalizzazione.
+        db.execSQL(
+            """
+            UPDATE house_categories
+            SET fixedExpenseDefaultCents = (
+                SELECT a.fixedExpensePlannedCents
+                FROM house_monthly_allocations a
+                INNER JOIN house_months hm ON hm.id = a.houseMonthId
+                WHERE a.categoryId = house_categories.id
+                  AND a.categoryBehavior = 'FIXED_EXPENSE'
+                  AND a.fixedExpensePlannedCents IS NOT NULL
+                ORDER BY hm.year DESC, hm.month DESC
+                LIMIT 1
+            )
+            WHERE behavior = 'FIXED_EXPENSE'
             """.trimIndent()
         )
     }
