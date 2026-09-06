@@ -116,18 +116,23 @@ class CreateHousePlanViewModel @Inject constructor(
         viewModelScope.launch {
             val state = _uiState.value
             val usualResources = appPreferencesRepository.usualHouseMonthlyResourcesCents.first()
-            carryover = housePlanRepository.getCarryoverFor(state.year, state.month)
-            val loaded = carryover ?: HouseMonthCarryover()
+            val loaded = housePlanRepository.getCarryoverFor(state.year, state.month)
+            carryover = loaded
+
+            // Build the first category snapshot only after carryover is available.
+            // This avoids a race where observeCategories() used to create zero-valued
+            // rows before carryover arrived, preventing openings/prefunding from being applied.
+            val initialCategories = categoryRepository.observeCategories().first()
             _uiState.value = _uiState.value.copy(
                 totalResourcesText = formatCentsForInput(usualResources),
                 openingAvailableText = formatCentsForInput(loaded.availableCents),
-                categories = _uiState.value.categories.map { initializeCategory(it.category, it, loaded) }
+                categories = initialCategories.map { category ->
+                    initializeCategory(category, null, loaded)
+                }
             )
-        }
-        viewModelScope.launch {
+
             categoryRepository.observeCategories().collect { categories ->
                 val previous = _uiState.value.categories.associateBy { it.category.id }
-                val loaded = carryover
                 _uiState.value = _uiState.value.copy(
                     categories = categories.map { category ->
                         previous[category.id]?.copy(category = category)
