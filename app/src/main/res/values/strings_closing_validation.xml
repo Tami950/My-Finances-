@@ -1,0 +1,3 @@
+<resources>
+    <string name="house_closing_fixed_destination_overflow">Questa spesa fissa riceve complessivamente %1$s in più del suo importo abituale.</string>
+</resources>
