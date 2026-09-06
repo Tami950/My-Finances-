@@ -58,6 +58,8 @@ data class HousePlanAllocation(
     val categoryName: String,
     val categoryType: HouseCategoryType,
     val targetCents: Long?,
+    val categoryBehavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
+    val fixedExpensePaymentStatus: FixedExpensePaymentStatus? = null,
     val openingBalanceCents: Long,
     val allocatedCents: Long
 ) {
@@ -86,7 +88,9 @@ data class HousePlanDraft(
 data class HousePlanAllocationDraft(
     val categoryId: Long,
     val openingBalanceCents: Long,
-    val allocatedCents: Long
+    val allocatedCents: Long,
+    val categoryBehavior: HouseCategoryBehavior = HouseCategoryBehavior.BUDGET,
+    val fixedExpensePaymentStatus: FixedExpensePaymentStatus? = null
 )
 
 data class HousePlanAccountBalanceDraft(
