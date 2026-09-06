@@ -88,6 +88,30 @@
     <string name="house_closing_adjusted_categories_count">Categorie con rettifica manuale: %1$d</string>
     <string name="house_closing_in_progress">Chiusura…</string>
 
+    <string name="house_category_fixed_expense">Spesa fissa</string>
+    <string name="house_category_fixed_expense_badge">Spesa fissa</string>
+    <string name="house_category_fixed_expense_help">L’importo pianificato viene considerato impegnato nel mese. Non richiede movimenti ordinari e in chiusura si riconcilia come spesa pagata, pendente o non più dovuta.</string>
+    <string name="house_fixed_expense_paid">Pagata</string>
+    <string name="house_fixed_expense_unpaid">Da pagare</string>
+    <string name="house_fixed_expense_mark_paid">Segna come pagata</string>
+    <string name="house_fixed_expense_mark_unpaid">Segna come da pagare</string>
+    <string name="house_fixed_expense_planned">Importo pianificato</string>
+    <string name="house_fixed_expense_actual">Importo reale</string>
+    <string name="house_fixed_expense_close_question">Questa spesa risulta ancora da pagare. Cosa è successo?</string>
+    <string name="house_fixed_expense_action_paid">L’ho pagata, non avevo aggiornato lo stato</string>
+    <string name="house_fixed_expense_action_pending">Resta da pagare</string>
+    <string name="house_fixed_expense_action_cancelled">Non è più dovuta</string>
+    <string name="house_fixed_expense_pending_note">Nota per il mese successivo (opzionale)</string>
+    <string name="house_fixed_expense_surplus">Importo liberato</string>
+    <string name="house_fixed_expense_deficit">Extra rispetto al pianificato</string>
+    <string name="house_fixed_expense_surplus_help">L’importo liberato va al Disponibile per default. Puoi spostarne una parte o tutto in altre categorie.</string>
+    <string name="house_fixed_expense_keep_available">Al Disponibile</string>
+    <string name="house_fixed_expense_deficit_help">L’extra viene tolto automaticamente dal Disponibile.</string>
+    <string name="house_fixed_expense_uncovered_warning">Le spese fisse superano il Disponibile di %1$s. La chiusura è comunque possibile, ma resta una discrepanza da controllare.</string>
+    <string name="house_fixed_expense_uncovered_confirm">Confermando, la discrepanza verrà conservata nello storico invece di inventare una provenienza del denaro.</string>
+    <string name="house_pending_fixed_expenses_title">Spese fisse pendenti</string>
+    <string name="house_pending_fixed_expense_inherited">Ereditato da %1$s</string>
+
     <string name="house_categories_title">Categorie Casa</string>
     <string name="house_categories_empty">Non hai ancora creato categorie.</string>
     <string name="house_add_category">Aggiungi categoria</string>
