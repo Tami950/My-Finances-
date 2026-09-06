@@ -3,6 +3,8 @@ package com.examplet.myfinances.ui.casa
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.examplet.myfinances.domain.model.FixedExpensePaymentStatus
+import com.examplet.myfinances.domain.model.HouseCategoryBehavior
 import com.examplet.myfinances.domain.model.HouseCategoryType
 import com.examplet.myfinances.domain.model.HouseMonthStatus
 import com.examplet.myfinances.domain.model.HousePlanAccountBalanceDraft
@@ -30,6 +32,8 @@ data class EditHousePlanCategoryUi(
     val name: String,
     val type: HouseCategoryType,
     val targetCents: Long?,
+    val categoryBehavior: HouseCategoryBehavior,
+    val fixedExpensePaymentStatus: FixedExpensePaymentStatus?,
     val openingBalanceText: String,
     val allocatedText: String
 )
@@ -47,6 +51,7 @@ data class EditHousePlanUiState(
     val status: HouseMonthStatus = HouseMonthStatus.OPEN,
     val totalResourcesText: String = "",
     val openingAvailableText: String = "",
+    val pendingFixedExpensesCents: Long = 0,
     val note: String = "",
     val categories: List<EditHousePlanCategoryUi> = emptyList(),
     val positions: List<EditHousePlanPositionUi> = emptyList(),
@@ -77,7 +82,7 @@ data class EditHousePlanUiState(
         get() = openingAvailableCents + totalResourcesCents - allocatedCents
 
     val totalHouseFundsCents: Long
-        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents
+        get() = totalResourcesCents + openingAvailableCents + openingBalanceCents + pendingFixedExpensesCents
 
     val unpositionedCents: Long
         get() = totalHouseFundsCents - positionedCents
@@ -142,6 +147,8 @@ class EditHousePlanViewModel @Inject constructor(
                                 name = allocation.categoryName,
                                 type = allocation.categoryType,
                                 targetCents = allocation.targetCents,
+                                categoryBehavior = allocation.categoryBehavior,
+                                fixedExpensePaymentStatus = allocation.fixedExpensePaymentStatus,
                                 openingBalanceText = formatCentsForInput(allocation.openingBalanceCents),
                                 allocatedText = formatCentsForInput(allocation.allocatedCents)
                             )
@@ -176,6 +183,7 @@ class EditHousePlanViewModel @Inject constructor(
                         openingAvailableText = if (firstLoad) {
                             formatCentsForInput(details.openingAvailableCents)
                         } else current.openingAvailableText,
+                        pendingFixedExpensesCents = details.pendingFixedExpensesCents,
                         note = if (firstLoad) details.note.orEmpty() else current.note,
                         categories = categoryDrafts,
                         positions = positionDrafts,
@@ -272,7 +280,9 @@ class EditHousePlanViewModel @Inject constructor(
                                         allocatedCents = parseEuroToCents(
                                             row.allocatedText,
                                             allowBlank = true
-                                        )
+                                        ),
+                                        categoryBehavior = row.categoryBehavior,
+                                        fixedExpensePaymentStatus = row.fixedExpensePaymentStatus
                                     )
                                 },
                                 accountBalances = emptyList()
